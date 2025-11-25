@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "990531650984",
+    "project_id": "mad-beast-mode",
+    "storage_bucket": "mad-beast-mode.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:990531650984:android:06b89a011741d7eff5099d",
+        "android_client_info": {
+          "package_name": "com.example.project_2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0cMswjo0aJ2hygzuDcIMTWzdFIj0t2FA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
