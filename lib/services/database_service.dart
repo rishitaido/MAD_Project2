@@ -32,15 +32,20 @@ class DatabaseService {
 
   // Get user's workouts
   Stream<List<WorkoutModel>> getUserWorkouts(String userId) {
-    return _firestore
-        .collection('workouts')
-        .where('userId', isEqualTo: userId)
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
+  return _firestore
+      .collection('workouts')
+      .where('userId', isEqualTo: userId)
+      .snapshots()
+      .map((snapshot) {
+        final workouts = snapshot.docs
             .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
-            .toList());
+            .toList();
+        // Sort in memory instead
+        workouts.sort((a, b) => b.date.compareTo(a.date));
+        return workouts;
+      });
   }
+
 
   // Get public feed
   Stream<List<WorkoutModel>> getPublicFeed() {

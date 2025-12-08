@@ -203,7 +203,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
                       ),
                       subtitle: Text(
                         '${exercise.sets} sets × ${exercise.reps} reps'
-                        '${exercise.weight != null ? ' @ ${exercise.weight}kg' : ''}',
+                        '${exercise.weight != null ? ' @ ${exercise.weight}lbs' : ''}',
                       ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
@@ -267,7 +267,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
                       controller: _weightController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                        labelText: 'Weight (kg) - Optional',
+                        labelText: 'Weight (lbs) - Optional',
                         border: OutlineInputBorder(),
                       ),
                     ),
