@@ -111,13 +111,13 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
         visibility: _visibility,
       );
 
-      // Save workout
-      await dbService.addWorkout(workout);
+      // Save workout and get the ID
+      final workoutId = await dbService.addWorkout(workout);
 
       // Create post if public
       if (_visibility == 'public') {
         await dbService.createPost(
-          workoutId: DateTime.now().millisecondsSinceEpoch.toString(),
+          workoutId: workoutId, // Use the actual workout ID
           userId: user.uid,
           userName: userData?.name ?? 'User',
           userPhoto: userData?.profilePhoto,
@@ -126,7 +126,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
               : null,
         );
       }
-
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

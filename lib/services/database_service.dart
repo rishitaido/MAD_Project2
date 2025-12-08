@@ -24,9 +24,10 @@ class DatabaseService {
     await _firestore.collection('users').doc(uid).update(data);
   }
 
-  // Add workout
-  Future<void> addWorkout(WorkoutModel workout) async {
-    await _firestore.collection('workouts').add(workout.toMap());
+  // Add workout also send to screen so it shows up
+  Future<String> addWorkout(WorkoutModel workout) async {
+    final docRef = await _firestore.collection('workouts').add(workout.toMap());
+    return docRef.id; 
   }
 
   // Get user's workouts
