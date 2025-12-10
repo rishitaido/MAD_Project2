@@ -83,7 +83,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
     }
 
     setState(() => _isLoading = true);
-
+    // Update challenge progress
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final user = authService.currentUser;
@@ -126,7 +126,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
               : null,
         );
       }
-      
+      await dbService.updateChallengeProgress(user.uid);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -157,6 +157,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
       }
     }
   }
+  
 
   @override
   Widget build(BuildContext context) {

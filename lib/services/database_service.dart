@@ -132,4 +132,73 @@ class DatabaseService {
         .get();
     return snapshot.docs.length;
   }
+
+  // Get active challenges
+  Stream<List<ChallengeModel>> getActiveChallenges() {
+    return _firestore
+        .collection('challenges')
+        .where('endDate', isGreaterThan: Timestamp.now())
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ChallengeModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  // Join challenge
+  Future<void> joinChallenge(String challengeId, String userId) async {
+    final challengeRef = _firestore.collection('challenges').doc(challengeId);
+    await challengeRef.update({
+      'participants': FieldValue.arrayUnion([userId]),
+      'leaderboard.$userId': 0,
+    });
+  }
+
+  // Leave challenge
+  Future<void> leaveChallenge(String challengeId, String userId) async {
+    final challengeRef = _firestore.collection('challenges').doc(challengeId);
+    await challengeRef.update({
+      'participants': FieldValue.arrayRemove([userId]),
+      'leaderboard.$userId': FieldValue.delete(),
+    });
+  }
+
+  // Update challenge progress (call this when user logs workout)
+  Future<void> updateChallengeProgress(String userId) async {
+    final challenges = await _firestore
+        .collection('challenges')
+        .where('participants', arrayContains: userId)
+        .where('endDate', isGreaterThan: Timestamp.now())
+        .get();
+
+    for (var doc in challenges.docs) {
+      final challenge = ChallengeModel.fromMap(doc.data(), doc.id);
+      final currentCount = challenge.leaderboard[userId] ?? 0;
+      
+      await doc.reference.update({
+        'leaderboard.$userId': currentCount + 1,
+      });
+    }
+  }
+
+  // Create a sample challenge (for testing)
+  Future<void> createSampleChallenge() async {
+    final now = DateTime.now();
+    final endOfWeek = now.add(Duration(days: 7 - now.weekday));
+    
+    final challenge = ChallengeModel(
+      id: '',
+      title: 'Weekly Warrior',
+      description: 'Complete 5 workouts this week',
+      type: 'workouts',
+      targetValue: 5,
+      startDate: now.subtract(const Duration(days: 1)),
+      endDate: endOfWeek,
+      participants: [],
+      leaderboard: {},
+    );
+
+    await _firestore.collection('challenges').add(challenge.toMap());
+  }
+
+  
 }
