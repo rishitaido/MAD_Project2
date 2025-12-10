@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'home/feed_screen.dart';
+import 'home/challenges_screen.dart';
 import 'home/log_workout_screen.dart';
+import 'home/progress_screen.dart';
 import 'home/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -15,7 +17,9 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const FeedScreen(),
+    const ChallengesScreen(),
     const LogWorkoutScreen(),
+    const ProgressScreen(),
     const ProfileScreen(),
   ];
 
@@ -35,9 +39,19 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Feed',
           ),
           NavigationDestination(
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events),
+            label: 'Challenges',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.add_circle_outline),
             selectedIcon: Icon(Icons.add_circle),
-            label: 'Log Workout',
+            label: 'Log',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Progress',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
