@@ -9,7 +9,10 @@ class WorkoutModel {
   final DateTime date;
   final List<Exercise> exercises;
   final int duration; // minutes
-  final String visibility; // public, friends, private
+  final String visibility; // public, private
+  final String? preWorkoutPhoto; 
+  final String? postWorkoutPhoto; 
+
 
   WorkoutModel({
     required this.id,
@@ -21,6 +24,8 @@ class WorkoutModel {
     required this.exercises,
     required this.duration,
     this.visibility = 'public',
+    this.preWorkoutPhoto,
+    this.postWorkoutPhoto
   });
 
   // Convert to Firestore-friendly map
@@ -35,6 +40,9 @@ class WorkoutModel {
       'exercises': exercises.map((e) => e.toMap()).toList(),
       'duration': duration,
       'visibility': visibility,
+      'preWorkoutPhoto' : preWorkoutPhoto,
+      'postWorkoutPhoto': postWorkoutPhoto,  
+
     };
   }
 
@@ -53,6 +61,8 @@ class WorkoutModel {
           [],
       duration: _parseInt(map['duration']),
       visibility: map['visibility'] ?? 'public',
+      preWorkoutPhoto: map['preWorkoutPhoto'],    
+      postWorkoutPhoto: map['postWorkoutPhoto'],  
     );
   }
 
@@ -100,9 +110,9 @@ class WorkoutModel {
 
 class Exercise {
   final String name;
-  final int sets;
-  final int reps;
-  final double? weight;
+  final String sets;
+  final String reps;
+  final String? weight;
 
   Exercise({
     required this.name,
@@ -121,19 +131,24 @@ class Exercise {
   }
 
   factory Exercise.fromMap(Map<String, dynamic> map) {
+    String setsStr = map['sets']?.toString() ?? '0'; 
+    String repsStr = map['reps']?.toString() ?? '0'; 
+    String? weightStr = map['weight']?.toString(); 
+
+
     return Exercise(
       name: map['name'] ?? '',
-      sets: WorkoutModel._parseInt(map['sets']),
-      reps: WorkoutModel._parseInt(map['reps']),
-      weight: _parseDouble(map['weight']),
+      sets: setsStr,
+      reps: repsStr,
+      weight: weightStr
     );
   }
 
   Exercise copyWith({
     String? name,
-    int? sets,
-    int? reps,
-    double? weight,
+    String? sets,
+    String? reps,
+    String? weight,
   }) {
     return Exercise(
       name: name ?? this.name,
@@ -141,14 +156,5 @@ class Exercise {
       reps: reps ?? this.reps,
       weight: weight ?? this.weight,
     );
-  }
-
-  static double? _parseDouble(dynamic value) {
-    if (value == null) return null;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
   }
 }

@@ -1,4 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+
 import '../models/user_model.dart';
 import '../models/workout_model.dart';
 import '../models/post_model.dart';
@@ -7,80 +10,95 @@ import '../models/comment_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // Get user data
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  //User Methods
   Future<UserModel?> getUserData(String uid) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
+      final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         return UserModel.fromMap(doc.data() as Map<String, dynamic>);
       }
     } catch (e) {
-      print('Error getting user data: $e');
+      print('❌ Error getting user data: $e');
     }
     return null;
   }
 
-  // Update user profile
   Future<void> updateUserProfile(String uid, Map<String, dynamic> data) async {
-    await _firestore.collection('users').doc(uid).update(data);
+    try {
+      await _firestore.collection('users').doc(uid).update(data);
+      print('✅ User profile updated');
+    } catch (e) {
+      print('❌ Error updating user profile: $e');
+      rethrow;
+    }
   }
 
-  // Add workout (ensures stored id matches Firestore doc id)
+  // Workout Methods
+
   Future<String> addWorkout(WorkoutModel workout) async {
-    final collection = _firestore.collection('workouts');
-    final docRef = collection.doc(); // pre-generate ID
-    final workoutWithId = workout.copyWith(id: docRef.id);
-
-    await docRef.set(workoutWithId.toMap());
-    return docRef.id;
+    try {
+      final docRef = await _firestore.collection('workouts').add(workout.toMap());
+      print('✅ Workout added: ${docRef.id}');
+      return docRef.id;
+    } catch (e) {
+      print('❌ Error adding workout: $e');
+      rethrow;
+    }
   }
 
-  // Update workout (for editing from Progress / history)
-  Future<void> updateWorkout(String workoutId, Map<String, dynamic> data) async {
-    await _firestore.collection('workouts').doc(workoutId).update(data);
+  Future<WorkoutModel?> getWorkout(String workoutId) async {
+    try {
+      final doc = await _firestore.collection('workouts').doc(workoutId).get();
+      if (doc.exists) {
+        return WorkoutModel.fromMap(doc.data()!, doc.id);
+      }
+    } catch (e) {
+      print('❌ Error getting workout: $e');
+    }
+    return null;
   }
 
-  // Delete workout (for swipe-to-delete from history)
-  Future<void> deleteWorkout(String workoutId) async {
-    await _firestore.collection('workouts').doc(workoutId).delete();
-  }
-
-  // Get user's workouts (newest first)
   Stream<List<WorkoutModel>> getUserWorkouts(String userId) {
     return _firestore
         .collection('workouts')
         .where('userId', isEqualTo: userId)
-        // keeping sorting client-side to avoid extra Firestore index requirements
         .snapshots()
         .map((snapshot) {
-      final workouts = snapshot.docs
-          .map((doc) => WorkoutModel.fromSnapshot(
-              doc as DocumentSnapshot<Map<String, dynamic>>))
-          .toList();
-
-      // Sort in memory: newest first
-      workouts.sort((a, b) => b.date.compareTo(a.date));
-      return workouts;
-    });
+          final workouts = snapshot.docs
+              .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
+              .toList();
+          // Sort newest first
+          workouts.sort((a, b) => b.date.compareTo(a.date));
+          return workouts;
+        });
   }
 
-  // Get public feed
-  Stream<List<WorkoutModel>> getPublicFeed() {
-    return _firestore
-        .collection('workouts')
-        .where('visibility', isEqualTo: 'public')
-        .orderBy('date', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => WorkoutModel.fromSnapshot(
-                doc as DocumentSnapshot<Map<String, dynamic>>))
-            .toList());
+  Future<int> getUserWorkoutCount(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('workouts')
+          .where('userId', isEqualTo: userId)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      print('❌ Error getting workout count: $e');
+      return 0;
+    }
   }
 
-  // Create post from workout
+  Future<void> deleteWorkout(String workoutId) async {
+    try {
+      await _firestore.collection('workouts').doc(workoutId).delete();
+      print('✅ Workout deleted');
+    } catch (e) {
+      print('❌ Error deleting workout: $e');
+      rethrow;
+    }
+  }
+
+  //  Post Method 
+
   Future<void> createPost({
     required String workoutId,
     required String userId,
@@ -100,37 +118,13 @@ class DatabaseService {
         'commentCount': 0,
       };
       await _firestore.collection('posts').add(post);
-      print('✅ Post created successfully');
+      print('✅ Post created');
     } catch (e) {
       print('❌ Error creating post: $e');
       rethrow;
     }
   }
 
-  // Delete post and its comments
-  Future<void> deletePost(String postId) async {
-    try {
-      // Delete the post
-      await _firestore.collection('posts').doc(postId).delete();
-
-      // Delete all comments for this post
-      final comments = await _firestore
-          .collection('comments')
-          .where('postId', isEqualTo: postId)
-          .get();
-
-      for (var doc in comments.docs) {
-        await doc.reference.delete();
-      }
-
-      print('✅ Post and comments deleted successfully');
-    } catch (e) {
-      print('❌ Error deleting post: $e');
-      rethrow;
-    }
-  }
-
-  // Get feed posts
   Stream<List<PostModel>> getFeedPosts() {
     return _firestore
         .collection('posts')
@@ -142,103 +136,51 @@ class DatabaseService {
             .toList());
   }
 
-  // Toggle like on post
   Future<void> toggleLike(String postId, String userId) async {
-    final postRef = _firestore.collection('posts').doc(postId);
-    final doc = await postRef.get();
-
-    if (doc.exists) {
-      final likes = List<String>.from(doc.data()?['likes'] ?? []);
-
-      if (likes.contains(userId)) {
-        likes.remove(userId);
-      } else {
-        likes.add(userId);
-      }
-
-      await postRef.update({'likes': likes});
-    }
-  }
-
-  // Get workout by ID
-  Future<WorkoutModel?> getWorkout(String workoutId) async {
     try {
-      final doc = await _firestore
-          .collection('workouts')
-          .doc(workoutId)
-          .get() as DocumentSnapshot<Map<String, dynamic>>;
+      final postRef = _firestore.collection('posts').doc(postId);
+      final doc = await postRef.get();
 
       if (doc.exists) {
-        return WorkoutModel.fromSnapshot(doc);
+        final likes = List<String>.from(doc.data()?['likes'] ?? []);
+        
+        if (likes.contains(userId)) {
+          likes.remove(userId);
+        } else {
+          likes.add(userId);
+        }
+
+        await postRef.update({'likes': likes});
       }
     } catch (e) {
-      print('Error getting workout: $e');
-    }
-    return null;
-  }
-
-  // Get user's workout count
-  Future<int> getUserWorkoutCount(String userId) async {
-    final snapshot = await _firestore
-        .collection('workouts')
-        .where('userId', isEqualTo: userId)
-        .get();
-    return snapshot.docs.length;
-  }
-
-  // Get active challenges
-  Stream<List<ChallengeModel>> getActiveChallenges() {
-    return _firestore
-        .collection('challenges')
-        .where('endDate', isGreaterThan: Timestamp.now())
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChallengeModel.fromMap(doc.data(), doc.id))
-            .toList());
-  }
-
-  // Join challenge
-  Future<void> joinChallenge(String challengeId, String userId) async {
-    final challengeRef =
-        _firestore.collection('challenges').doc(challengeId);
-    await challengeRef.update({
-      'participants': FieldValue.arrayUnion([userId]),
-      'leaderboard.$userId': 0,
-    });
-  }
-
-  // Leave challenge
-  Future<void> leaveChallenge(String challengeId, String userId) async {
-    final challengeRef =
-        _firestore.collection('challenges').doc(challengeId);
-    await challengeRef.update({
-      'participants': FieldValue.arrayRemove([userId]),
-      'leaderboard.$userId': FieldValue.delete(),
-    });
-  }
-
-  // Create challenge
-  Future<void> createChallenge(ChallengeModel challenge) async {
-    await _firestore.collection('challenges').add(challenge.toMap());
-  }
-
-  // Update challenge progress (call this when user logs workout)
-  Future<void> updateChallengeProgress(String userId) async {
-    final challenges = await _firestore
-        .collection('challenges')
-        .where('participants', arrayContains: userId)
-        .where('endDate', isGreaterThan: Timestamp.now())
-        .get();
-
-    for (var doc in challenges.docs) {
-      final challenge = ChallengeModel.fromMap(doc.data(), doc.id);
-      final currentCount = challenge.leaderboard[userId] ?? 0;
-
-      await doc.reference.update({
-        'leaderboard.$userId': currentCount + 1,
-      });
+      print('❌ Error toggling like: $e');
+      rethrow;
     }
   }
+
+  Future<void> deletePost(String postId) async {
+    try {
+      // Delete post
+      await _firestore.collection('posts').doc(postId).delete();
+
+      // Delete all comments
+      final comments = await _firestore
+          .collection('comments')
+          .where('postId', isEqualTo: postId)
+          .get();
+
+      for (var doc in comments.docs) {
+        await doc.reference.delete();
+      }
+
+      print('✅ Post and comments deleted');
+    } catch (e) {
+      print('❌ Error deleting post: $e');
+      rethrow;
+    }
+  }
+
+  //Comment Methods 
 
   Future<void> addComment({
     required String postId,
@@ -260,20 +202,18 @@ class DatabaseService {
 
       await _firestore.collection('comments').add(comment.toMap());
 
-      // Increment comment count on post
-      final postRef = _firestore.collection('posts').doc(postId);
-      await postRef.update({
+      // Increment comment count
+      await _firestore.collection('posts').doc(postId).update({
         'commentCount': FieldValue.increment(1),
       });
 
-      print('✅ Comment added successfully');
+      print('✅ Comment added');
     } catch (e) {
       print('❌ Error adding comment: $e');
       rethrow;
     }
   }
 
-  // Get comments for a post
   Stream<List<CommentModel>> getComments(String postId) {
     return _firestore
         .collection('comments')
@@ -285,18 +225,113 @@ class DatabaseService {
             .toList());
   }
 
-  // Delete comment
   Future<void> deleteComment(String commentId, String postId) async {
     try {
       await _firestore.collection('comments').doc(commentId).delete();
 
       // Decrement comment count
-      final postRef = _firestore.collection('posts').doc(postId);
-      await postRef.update({
+      await _firestore.collection('posts').doc(postId).update({
         'commentCount': FieldValue.increment(-1),
       });
+
+      print('✅ Comment deleted');
     } catch (e) {
-      print('Error deleting comment: $e');
+      print('❌ Error deleting comment: $e');
+      rethrow;
+    }
+  }
+
+  //  Challenge Methods 
+
+  Stream<List<ChallengeModel>> getActiveChallenges() {
+    return _firestore
+        .collection('challenges')
+        .where('endDate', isGreaterThan: Timestamp.now())
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ChallengeModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> createChallenge(ChallengeModel challenge) async {
+    try {
+      await _firestore.collection('challenges').add(challenge.toMap());
+      print('✅ Challenge created');
+    } catch (e) {
+      print('❌ Error creating challenge: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> joinChallenge(String challengeId, String userId) async {
+    try {
+      await _firestore.collection('challenges').doc(challengeId).update({
+        'participants': FieldValue.arrayUnion([userId]),
+        'leaderboard.$userId': 0,
+      });
+      print('✅ Joined challenge');
+    } catch (e) {
+      print('❌ Error joining challenge: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> leaveChallenge(String challengeId, String userId) async {
+    try {
+      await _firestore.collection('challenges').doc(challengeId).update({
+        'participants': FieldValue.arrayRemove([userId]),
+        'leaderboard.$userId': FieldValue.delete(),
+      });
+      print('✅ Left challenge');
+    } catch (e) {
+      print('❌ Error leaving challenge: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateChallengeProgress(String userId) async {
+    try {
+      final challenges = await _firestore
+          .collection('challenges')
+          .where('participants', arrayContains: userId)
+          .where('endDate', isGreaterThan: Timestamp.now())
+          .get();
+
+      for (var doc in challenges.docs) {
+        final challenge = ChallengeModel.fromMap(doc.data(), doc.id);
+        final currentCount = challenge.leaderboard[userId] ?? 0;
+
+        await doc.reference.update({
+          'leaderboard.$userId': currentCount + 1,
+        });
+      }
+      
+      if (challenges.docs.isNotEmpty) {
+        print('✅ Challenge progress updated');
+      }
+    } catch (e) {
+      print('❌ Error updating challenge progress: $e');
+    }
+  }
+
+  // Storage for Pictures  
+
+  Future<String> uploadWorkoutPhoto(String userId, File imageFile) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final ref = _storage
+          .ref()
+          .child('workout_photos')
+          .child(userId)
+          .child('$timestamp.jpg');
+
+      await ref.putFile(imageFile);
+      final url = await ref.getDownloadURL();
+      
+      print('✅ Photo uploaded');
+      return url;
+    } catch (e) {
+      print('❌ Error uploading photo: $e');
       rethrow;
     }
   }
