@@ -157,3 +157,43 @@ Because the rebase applied cleanly and did not rewrite any shared history, a sta
 
 Result:
 The local main branch is now fully aligned with origin/main using a clean, linear commit history. The divergence warning is resolved, and the branch is ready for continued development without unnecessary merge clutter.
+
+5. Native Splash Screen Setup & Logo Prompt
+
+Date: 2025-11-25
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+
+Asked for the specific commands needed to add a native splash screen to the Flutter app.
+
+AI provided the required Flutter commands for installing and generating the splash using the flutter_native_splash package, including:
+
+Adding the package
+
+Running the splash screen creation tool
+
+Optional removal/reset commands
+
+In the same discussion, asked for a unique splash-screen logo that fits the theme of the Social Fitness Tracker called Beast Mode, using a deep-orange color scheme and no text.
+
+AI generated an original beast-style emblem designed to represent intensity and strength, visually aligning with the app’s brand identity.
+
+How It Was Applied:
+
+Added the flutter_native_splash package to the project and prepared the YAML configuration for the splash setup.
+
+Recorded the provided commands for generating and updating the splash screen during development.
+
+Saved the generated Beast Mode logo as the main image asset for the splash screen, storing it under the project’s image directory for future use.
+
+Reflection / What Was Learned:
+
+The splash screen setup in Flutter is primarily command-driven and relies on a simple YAML configuration to apply images and colors across platforms.
+
+Using the flutter_native_splash tool ensures consistent behavior on Android, iOS, and Android 12-specific requirements without manually editing platform files.
+
+Creating a strong, brand-aligned logo early helps establish a unified aesthetic and provides a visual anchor for the app’s identity.
+
+Result:
+The project now has a clear set of native splash screen commands documented for team use, along with a custom Beast Mode logo ready to be integrated into the splash screen visuals and future branding elements.
