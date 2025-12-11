@@ -197,3 +197,98 @@ Creating a strong, brand-aligned logo early helps establish a unified aesthetic 
 
 Result:
 The project now has a clear set of native splash screen commands documented for team use, along with a custom Beast Mode logo ready to be integrated into the splash screen visuals and future branding elements.
+
+6. Firestore Composite Index Error
+
+Date: 2025-12-11
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+
+Reported a Firestore runtime error indicating:
+“FAILED_PRECONDITION: The query requires an index.”
+
+This occurred on a query in the challenges collection that combined:
+
+array_contains on the participants field
+
+An inequality filter on endDate
+
+An orderBy endDate
+
+Asked what the error meant and how to resolve it.
+
+AI explained that Firestore requires a composite index when multiple conditions (such as array filters and inequality filters) are used together with ordering.
+
+Noted that Firestore provides an auto-generated link in the error message which pre-fills the necessary index configuration in the Firebase console.
+
+How It Was Applied:
+
+Opened the link provided by Firestore, which loaded the index creation form with the following fields pre-configured:
+
+participants — array_contains
+
+endDate — ascending
+
+__name__ — ascending
+
+Created the composite index directly in the Firebase console.
+
+Waited for the index to finish building (typically 1–3 minutes).
+
+Re-ran the query after the index finished deploying, and the error was resolved immediately.
+
+Reflection / What Was Learned:
+
+Firestore requires composite indexes for complex queries that involve combining array operations, inequality filters, and sorting.
+
+The error message always includes a direct link to create the exact index needed, which makes resolving index issues straightforward.
+
+Understanding when Firestore needs indexes helps anticipate necessary backend configuration as queries grow more advanced.
+
+Composite indexes are essential for keeping Firestore queries performant and scalable.
+
+Result:
+The missing composite index was successfully created, resolving the FAILED_PRECONDITION error. The challenges query now executes normally and returns results as expected.
+
+7. WorkoutModel Mapping Errors in Database Service
+
+Date: 2025-12-11
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+
+Reported two related Dart errors in database_service.dart:
+
+“Member not found: 'WorkoutModel.fromSnapshot'”
+
+“A value of type 'List<dynamic>' can't be returned from a function with return type 'List<WorkoutModel>'.”
+
+Asked what these errors meant and how they were connected.
+
+AI explained that the first error indicates that WorkoutModel does not contain a constructor or factory method named fromSnapshot, even though the service code attempts to call it.
+
+Because Dart cannot resolve the constructor, the mapping operation produces a list of dynamic values instead of WorkoutModel objects, causing the second error when returning the list.
+
+How It Was Applied:
+
+Reviewed the WorkoutModel class to confirm which constructor actually exists (e.g., fromMap, fromJson, or another name).
+
+Updated the Firestore mapping logic in database_service.dart to use the correct constructor from the model.
+
+Ensured the mapping function produces a strongly typed WorkoutModel instance for each document.
+
+Reran the build after making the correction and confirmed that both errors were resolved and the return type now matches List<WorkoutModel>.
+
+Reflection / What Was Learned:
+
+A missing or mismatched constructor name in a model is a common cause of Firestore mapping issues.
+
+Dart infers the output of .map() based on the return value; when the mapping function fails, the result defaults to dynamic, which breaks type safety.
+
+Keeping naming consistent between models and service-layer mapping functions prevents these issues and makes Firestore interactions more reliable.
+
+Understanding how Dart infers list types is useful when debugging collection-returning functions.
+
+Result:
+After updating the constructor reference to match the actual WorkoutModel API, the Firestore mapping logic now returns a properly typed List<WorkoutModel>, resolving both the missing member error and the type mismatch error.
