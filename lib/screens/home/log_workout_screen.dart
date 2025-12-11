@@ -15,6 +15,7 @@ class LogWorkoutScreen extends StatefulWidget {
 
 class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
   final _captionController = TextEditingController();
+  final _durationController = TextEditingController(); // NEW
   final _exerciseNameController = TextEditingController();
   final _setsController = TextEditingController();
   final _repsController = TextEditingController();
@@ -31,6 +32,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
   @override
   void dispose() {
     _captionController.dispose();
+    _durationController.dispose(); // NEW
     _exerciseNameController.dispose();
     _setsController.dispose();
     _repsController.dispose();
@@ -138,6 +140,18 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
       return;
     }
 
+    // Validate duration input
+    if (_durationController.text.isEmpty) {
+      _showError('Please enter workout duration', isWarning: true);
+      return;
+    }
+
+    final duration = int.tryParse(_durationController.text);
+    if (duration == null || duration <= 0) {
+      _showError('Please enter a valid duration in minutes', isWarning: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -165,7 +179,7 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
         userPhoto: userData?.profilePhoto,
         date: DateTime.now(),
         exercises: _exercises,
-        duration: _estimateDuration(),
+        duration: duration, // Use manual input
         visibility: _visibility,
         preWorkoutPhoto: prePhotoUrl,
         postWorkoutPhoto: postPhotoUrl,
@@ -197,22 +211,11 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
     }
   }
 
-  int _estimateDuration() {
-    int totalSets = 0;
-    for (var exercise in _exercises) {
-      try {
-        totalSets += int.parse(exercise.sets.split('-')[0].trim());
-      } catch (e) {
-        totalSets += 3;
-      }
-    }
-    return totalSets * 2;
-  }
-
   void _clearForm() {
     setState(() {
       _exercises.clear();
       _captionController.clear();
+      _durationController.clear(); // NEW
       _visibility = 'public';
       _preWorkoutImage = null;
       _postWorkoutImage = null;
@@ -277,6 +280,20 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 24),
+
+            // Duration input - NEW
+            TextField(
+              controller: _durationController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Workout Duration (minutes)',
+                hintText: 'e.g., 45',
+                prefixIcon: const Icon(Icons.timer),
+                border: const OutlineInputBorder(),
+                helperText: 'How long was your workout?',
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -391,6 +408,7 @@ class _ExerciseForm extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: setsController,
+                    keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Sets',
                       hintText: '3 or 3-4',
@@ -402,6 +420,7 @@ class _ExerciseForm extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: repsController,
+                    keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Reps',
                       hintText: '8-12',
@@ -414,6 +433,7 @@ class _ExerciseForm extends StatelessWidget {
             const SizedBox(height: 12),
             TextField(
               controller: weightController,
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Weight (lbs) - Optional',
                 hintText: '135-155-185',
