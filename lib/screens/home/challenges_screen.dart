@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_2/screens/home/create_challenge_screen.dart';
 import 'package:provider/provider.dart';
 import '../../models/challenge_model.dart';
 import '../../models/user_model.dart';
@@ -19,14 +20,13 @@ class ChallengesScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () async {
-              // Create a sample challenge for testing
-              await dbService.createSampleChallenge();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sample challenge created!')),
-                );
-              }
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(
+                  builder: (context) => const CreateChallengeScreen(),
+                ),
+              );
             },
           ),
         ],

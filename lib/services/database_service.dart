@@ -25,7 +25,7 @@ class DatabaseService {
     await _firestore.collection('users').doc(uid).update(data);
   }
 
-  // Add workout also send to screen so it shows up
+  // Add workout
   Future<String> addWorkout(WorkoutModel workout) async {
     final docRef = await _firestore.collection('workouts').add(workout.toMap());
     return docRef.id; 
@@ -33,20 +33,19 @@ class DatabaseService {
 
   // Get user's workouts
   Stream<List<WorkoutModel>> getUserWorkouts(String userId) {
-  return _firestore
-      .collection('workouts')
-      .where('userId', isEqualTo: userId)
-      .snapshots()
-      .map((snapshot) {
-        final workouts = snapshot.docs
-            .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
-            .toList();
-        // Sort in memory instead
-        workouts.sort((a, b) => b.date.compareTo(a.date));
-        return workouts;
-      });
+    return _firestore
+        .collection('workouts')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final workouts = snapshot.docs
+              .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
+              .toList();
+          // Sort in memory instead
+          workouts.sort((a, b) => b.date.compareTo(a.date));
+          return workouts;
+        });
   }
-
 
   // Get public feed
   Stream<List<WorkoutModel>> getPublicFeed() {
@@ -69,17 +68,23 @@ class DatabaseService {
     String? userPhoto,
     String? caption,
   }) async {
-    final post = {
-      'workoutId': workoutId,
-      'userId': userId,
-      'userName': userName,
-      'userPhoto': userPhoto,
-      'caption': caption,
-      'timestamp': FieldValue.serverTimestamp(),
-      'likes': [],
-      'commentCount': 0,
-    };
-    await _firestore.collection('posts').add(post);
+    try {
+      final post = {
+        'workoutId': workoutId,
+        'userId': userId,
+        'userName': userName,
+        'userPhoto': userPhoto,
+        'caption': caption,
+        'timestamp': FieldValue.serverTimestamp(),
+        'likes': [],
+        'commentCount': 0,
+      };
+      await _firestore.collection('posts').add(post);
+      print('✅ Post created successfully');
+    } catch (e) {
+      print('❌ Error creating post: $e');
+      rethrow;
+    }
   }
 
   // Get feed posts
@@ -163,6 +168,11 @@ class DatabaseService {
     });
   }
 
+  // Create challenge
+  Future<void> createChallenge(ChallengeModel challenge) async {
+    await _firestore.collection('challenges').add(challenge.toMap());
+  }
+
   // Update challenge progress (call this when user logs workout)
   Future<void> updateChallengeProgress(String userId) async {
     final challenges = await _firestore
@@ -180,26 +190,4 @@ class DatabaseService {
       });
     }
   }
-
-  // Create a sample challenge (for testing)
-  Future<void> createSampleChallenge() async {
-    final now = DateTime.now();
-    final endOfWeek = now.add(Duration(days: 7 - now.weekday));
-    
-    final challenge = ChallengeModel(
-      id: '',
-      title: 'Weekly Warrior',
-      description: 'Complete 5 workouts this week',
-      type: 'workouts',
-      targetValue: 5,
-      startDate: now.subtract(const Duration(days: 1)),
-      endDate: endOfWeek,
-      participants: [],
-      leaderboard: {},
-    );
-
-    await _firestore.collection('challenges').add(challenge.toMap());
-  }
-
-  
 }
