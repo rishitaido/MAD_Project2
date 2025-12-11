@@ -11,7 +11,8 @@ class DatabaseService {
   // Get user data
   Future<UserModel?> getUserData(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         return UserModel.fromMap(doc.data() as Map<String, dynamic>);
       }
@@ -26,26 +27,43 @@ class DatabaseService {
     await _firestore.collection('users').doc(uid).update(data);
   }
 
-  // Add workout
+  // Add workout (ensures stored id matches Firestore doc id)
   Future<String> addWorkout(WorkoutModel workout) async {
-    final docRef = await _firestore.collection('workouts').add(workout.toMap());
-    return docRef.id; 
+    final collection = _firestore.collection('workouts');
+    final docRef = collection.doc(); // pre-generate ID
+    final workoutWithId = workout.copyWith(id: docRef.id);
+
+    await docRef.set(workoutWithId.toMap());
+    return docRef.id;
   }
 
-  // Get user's workouts
+  // Update workout (for editing from Progress / history)
+  Future<void> updateWorkout(String workoutId, Map<String, dynamic> data) async {
+    await _firestore.collection('workouts').doc(workoutId).update(data);
+  }
+
+  // Delete workout (for swipe-to-delete from history)
+  Future<void> deleteWorkout(String workoutId) async {
+    await _firestore.collection('workouts').doc(workoutId).delete();
+  }
+
+  // Get user's workouts (newest first)
   Stream<List<WorkoutModel>> getUserWorkouts(String userId) {
     return _firestore
         .collection('workouts')
         .where('userId', isEqualTo: userId)
+        // keeping sorting client-side to avoid extra Firestore index requirements
         .snapshots()
         .map((snapshot) {
-          final workouts = snapshot.docs
-              .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
-              .toList();
-          // Sort in memory instead
-          workouts.sort((a, b) => b.date.compareTo(a.date));
-          return workouts;
-        });
+      final workouts = snapshot.docs
+          .map((doc) => WorkoutModel.fromSnapshot(
+              doc as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+
+      // Sort in memory: newest first
+      workouts.sort((a, b) => b.date.compareTo(a.date));
+      return workouts;
+    });
   }
 
   // Get public feed
@@ -57,7 +75,8 @@ class DatabaseService {
         .limit(50)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
+            .map((doc) => WorkoutModel.fromSnapshot(
+                doc as DocumentSnapshot<Map<String, dynamic>>))
             .toList());
   }
 
@@ -93,17 +112,17 @@ class DatabaseService {
     try {
       // Delete the post
       await _firestore.collection('posts').doc(postId).delete();
-      
+
       // Delete all comments for this post
       final comments = await _firestore
           .collection('comments')
           .where('postId', isEqualTo: postId)
           .get();
-      
+
       for (var doc in comments.docs) {
         await doc.reference.delete();
       }
-      
+
       print('✅ Post and comments deleted successfully');
     } catch (e) {
       print('❌ Error deleting post: $e');
@@ -144,9 +163,13 @@ class DatabaseService {
   // Get workout by ID
   Future<WorkoutModel?> getWorkout(String workoutId) async {
     try {
-      final doc = await _firestore.collection('workouts').doc(workoutId).get();
+      final doc = await _firestore
+          .collection('workouts')
+          .doc(workoutId)
+          .get() as DocumentSnapshot<Map<String, dynamic>>;
+
       if (doc.exists) {
-        return WorkoutModel.fromMap(doc.data()!, doc.id);
+        return WorkoutModel.fromSnapshot(doc);
       }
     } catch (e) {
       print('Error getting workout: $e');
@@ -176,7 +199,8 @@ class DatabaseService {
 
   // Join challenge
   Future<void> joinChallenge(String challengeId, String userId) async {
-    final challengeRef = _firestore.collection('challenges').doc(challengeId);
+    final challengeRef =
+        _firestore.collection('challenges').doc(challengeId);
     await challengeRef.update({
       'participants': FieldValue.arrayUnion([userId]),
       'leaderboard.$userId': 0,
@@ -185,7 +209,8 @@ class DatabaseService {
 
   // Leave challenge
   Future<void> leaveChallenge(String challengeId, String userId) async {
-    final challengeRef = _firestore.collection('challenges').doc(challengeId);
+    final challengeRef =
+        _firestore.collection('challenges').doc(challengeId);
     await challengeRef.update({
       'participants': FieldValue.arrayRemove([userId]),
       'leaderboard.$userId': FieldValue.delete(),
@@ -208,7 +233,7 @@ class DatabaseService {
     for (var doc in challenges.docs) {
       final challenge = ChallengeModel.fromMap(doc.data(), doc.id);
       final currentCount = challenge.leaderboard[userId] ?? 0;
-      
+
       await doc.reference.update({
         'leaderboard.$userId': currentCount + 1,
       });
@@ -275,5 +300,4 @@ class DatabaseService {
       rethrow;
     }
   }
-
 }
