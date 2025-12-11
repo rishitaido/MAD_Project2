@@ -5,6 +5,7 @@ class WorkoutModel {
   final String userId;
   final String userName;
   final String? userPhoto;
+  final String? title; // Optional, for naming workouts like "Push Day"
   final DateTime date;
   final List<Exercise> exercises;
   final int duration; // minutes
@@ -15,18 +16,21 @@ class WorkoutModel {
     required this.userId,
     required this.userName,
     this.userPhoto,
+    this.title,
     required this.date,
     required this.exercises,
     required this.duration,
     this.visibility = 'public',
   });
 
+  // Convert to Firestore-friendly map
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'userId': userId,
       'userName': userName,
       'userPhoto': userPhoto,
+      'title': title,
       'date': Timestamp.fromDate(date),
       'exercises': exercises.map((e) => e.toMap()).toList(),
       'duration': duration,
@@ -34,19 +38,63 @@ class WorkoutModel {
     };
   }
 
+  // Build from a raw map + doc ID
   factory WorkoutModel.fromMap(Map<String, dynamic> map, String docId) {
     return WorkoutModel(
       id: docId,
       userId: map['userId'] ?? '',
       userName: map['userName'] ?? '',
       userPhoto: map['userPhoto'],
+      title: map['title'], // may be null for older docs
       date: (map['date'] as Timestamp).toDate(),
-      exercises: (map['exercises'] as List)
-          .map((e) => Exercise.fromMap(e))
-          .toList(),
-      duration: map['duration'] ?? 0,
+      exercises: (map['exercises'] as List?)
+              ?.map((e) => Exercise.fromMap(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      duration: _parseInt(map['duration']),
       visibility: map['visibility'] ?? 'public',
     );
+  }
+
+  // Optional convenience: build directly from a DocumentSnapshot
+  factory WorkoutModel.fromSnapshot(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data() ?? {};
+    return WorkoutModel.fromMap(data, doc.id);
+  }
+
+  // Easy way to update parts of a workout immutably
+  WorkoutModel copyWith({
+    String? id,
+    String? userId,
+    String? userName,
+    String? userPhoto,
+    String? title,
+    DateTime? date,
+    List<Exercise>? exercises,
+    int? duration,
+    String? visibility,
+  }) {
+    return WorkoutModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      userPhoto: userPhoto ?? this.userPhoto,
+      title: title ?? this.title,
+      date: date ?? this.date,
+      exercises: exercises ?? this.exercises,
+      duration: duration ?? this.duration,
+      visibility: visibility ?? this.visibility,
+    );
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 }
 
@@ -75,9 +123,32 @@ class Exercise {
   factory Exercise.fromMap(Map<String, dynamic> map) {
     return Exercise(
       name: map['name'] ?? '',
-      sets: map['sets'] ?? 0,
-      reps: map['reps'] ?? 0,
-      weight: map['weight']?.toDouble(),
+      sets: WorkoutModel._parseInt(map['sets']),
+      reps: WorkoutModel._parseInt(map['reps']),
+      weight: _parseDouble(map['weight']),
     );
+  }
+
+  Exercise copyWith({
+    String? name,
+    int? sets,
+    int? reps,
+    double? weight,
+  }) {
+    return Exercise(
+      name: name ?? this.name,
+      sets: sets ?? this.sets,
+      reps: reps ?? this.reps,
+      weight: weight ?? this.weight,
+    );
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 }
