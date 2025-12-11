@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/workout_model.dart';
 import '../models/post_model.dart';
 import '../models/challenge_model.dart';
+import '../models/comment_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -83,6 +84,29 @@ class DatabaseService {
       print('✅ Post created successfully');
     } catch (e) {
       print('❌ Error creating post: $e');
+      rethrow;
+    }
+  }
+
+  // Delete post and its comments
+  Future<void> deletePost(String postId) async {
+    try {
+      // Delete the post
+      await _firestore.collection('posts').doc(postId).delete();
+      
+      // Delete all comments for this post
+      final comments = await _firestore
+          .collection('comments')
+          .where('postId', isEqualTo: postId)
+          .get();
+      
+      for (var doc in comments.docs) {
+        await doc.reference.delete();
+      }
+      
+      print('✅ Post and comments deleted successfully');
+    } catch (e) {
+      print('❌ Error deleting post: $e');
       rethrow;
     }
   }
@@ -190,4 +214,66 @@ class DatabaseService {
       });
     }
   }
+
+  Future<void> addComment({
+    required String postId,
+    required String userId,
+    required String userName,
+    String? userPhoto,
+    required String text,
+  }) async {
+    try {
+      final comment = CommentModel(
+        id: '',
+        postId: postId,
+        userId: userId,
+        userName: userName,
+        userPhoto: userPhoto,
+        text: text,
+        timestamp: DateTime.now(),
+      );
+
+      await _firestore.collection('comments').add(comment.toMap());
+
+      // Increment comment count on post
+      final postRef = _firestore.collection('posts').doc(postId);
+      await postRef.update({
+        'commentCount': FieldValue.increment(1),
+      });
+
+      print('✅ Comment added successfully');
+    } catch (e) {
+      print('❌ Error adding comment: $e');
+      rethrow;
+    }
+  }
+
+  // Get comments for a post
+  Stream<List<CommentModel>> getComments(String postId) {
+    return _firestore
+        .collection('comments')
+        .where('postId', isEqualTo: postId)
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  // Delete comment
+  Future<void> deleteComment(String commentId, String postId) async {
+    try {
+      await _firestore.collection('comments').doc(commentId).delete();
+
+      // Decrement comment count
+      final postRef = _firestore.collection('posts').doc(postId);
+      await postRef.update({
+        'commentCount': FieldValue.increment(-1),
+      });
+    } catch (e) {
+      print('Error deleting comment: $e');
+      rethrow;
+    }
+  }
+
 }

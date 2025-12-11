@@ -5,6 +5,8 @@ import '../../models/post_model.dart';
 import '../../models/workout_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
+import 'comments_screen.dart';
+
 
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
@@ -119,34 +121,100 @@ class PostCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: post.userPhoto != null
-                  ? NetworkImage(post.userPhoto!)
-                  : null,
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: post.userPhoto == null
-                  ? Text(
-                      post.userName.substring(0, 1).toUpperCase(),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+      ListTile(
+        leading: CircleAvatar(
+          backgroundImage: post.userPhoto != null
+              ? NetworkImage(post.userPhoto!)
+              : null,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: post.userPhoto == null
+              ? Text(
+                  post.userName.substring(0, 1).toUpperCase(),
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer,
+                  ),
+                )
+              : null,
+        ),
+        title: Text(
+          post.userName,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(_getTimeAgo(post.timestamp)),
+        trailing: currentUserId == post.userId
+            ? PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'delete') {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Post'),
+                        content: const Text(
+                            'Are you sure you want to delete this post? This will also delete all comments.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Delete'),
+                          ),
+                        ],
                       ),
-                    )
-                  : null,
-            ),
-            title: Text(
-              post.userName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(_getTimeAgo(post.timestamp)),
-            trailing: IconButton(
-              icon: const Icon(Icons.more_vert),
-              onPressed: () {
-                // TODO: Show options
-              },
-            ),
-          ),
+                    );
 
+                    if (confirm == true) {
+                      try {
+                        await DatabaseService().deletePost(post.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Post deleted'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete Post'),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : IconButton(
+                icon: const Icon(Icons.more_vert),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Report feature coming soon')),
+                  );
+                },
+              ),
+      ),
           // Workout details
           FutureBuilder<WorkoutModel?>(
             future: DatabaseService().getWorkout(post.workoutId),
@@ -225,8 +293,11 @@ class PostCard extends StatelessWidget {
                 ),
                 TextButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Comments coming in Week 3!')),
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => CommentsScreen(post: post),
+                      )
                     );
                   },
                   icon: const Icon(Icons.comment_outlined),
