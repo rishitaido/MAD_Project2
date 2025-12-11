@@ -75,3 +75,85 @@ Errors like this emphasize the importance of verifying file locations and class 
 
 Result:
 The PostModel class is now properly recognized in database_service.dart, resolving the type error and allowing development on post-related features to continue smoothly.
+
+3. Email Validator Syntax Error
+
+Date: 2025-12-11
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+
+Reported a Dart analyzer error in validators.dart stating: “Expected to find ')'.”
+
+The error appeared on the third line inside the email validation function.
+
+Asked what the message was referring to and why it occurred.
+
+AI explained that the issue was caused by a missing logical operator in the if condition checking whether the email value was null or empty.
+
+Clarified that Dart requires a valid operator between multiple conditions, and without it, the analyzer cannot parse the expression, resulting in the syntax error.
+
+How It Was Applied:
+
+Reviewed the validator code and located the incorrect condition.
+
+Identified that two checks were placed next to each other without a logical separator.
+
+Added the correct logical operator to combine the conditions properly.
+
+Confirmed that after correcting the expression, the validator compiled successfully and handled null/empty values as intended.
+
+Reflection / What Was Learned:
+
+Dart strictly enforces proper logical operators when combining conditions; leaving one out causes structural parsing errors.
+
+Validator functions rely heavily on clean, explicit conditional logic, so small syntax mistakes can break form handling.
+
+Analyzer errors about parentheses or expected tokens often signal missing operators or malformed expressions.
+
+This highlighted the importance of scanning conditional statements closely when implementing validation utilities.
+
+Result:
+Fixing the missing logical operator resolved the syntax error in validators.dart, restoring proper email validation and preventing issues during form submission.
+
+4. Resolving Diverged Main Branch with Git Rebase
+
+Date: 2025-12-11
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+
+Noticed the Git message indicating that the local main branch and origin/main had diverged, each containing unique commits.
+
+Asked how to correctly synchronize the branches without introducing unnecessary merge commits.
+
+AI walked through checking branch state using git status, git branch -vv, and a visual graph log to understand how the histories split.
+
+Explained what “ahead 1, behind 2” means and recommended using a rebase instead of a merge to maintain a clean, linear history.
+
+Suggested running git pull --rebase origin main followed by a normal push once the rebase completed.
+
+How It Was Applied:
+
+Ran the suggested diagnostic commands to confirm that the local branch was ahead by one commit and behind by two remote commits.
+
+Identified a merge commit on the remote and one local commit that had not been incorporated yet.
+
+Executed the recommended git pull --rebase origin main, which fetched updates and replayed the local commit on top of the remote’s latest state.
+
+Verified a clean working directory afterward using git status.
+
+Pushed the updated branch with git push origin main, successfully updating the remote branch without needing a force push.
+
+Reflection / What Was Learned:
+
+“Ahead X, behind Y” indicates that both the local and remote branches contain different commits—meaning the histories have diverged, not just drifted.
+
+Using git pull --rebase keeps commit history clean by placing local changes on top of the latest remote state rather than creating extra merge commits.
+
+Visualizing branch history with a graph log is a quick and effective way to understand how commits relate and where divergence happened.
+
+Because the rebase applied cleanly and did not rewrite any shared history, a standard push was sufficient to resynchronize the branch.
+
+Result:
+The local main branch is now fully aligned with origin/main using a clean, linear commit history. The divergence warning is resolved, and the branch is ready for continued development without unnecessary merge clutter.
