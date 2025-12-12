@@ -11,6 +11,7 @@ import '../models/comment_model.dart';
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
   //User Methods
   Future<UserModel?> getUserData(String uid) async {
     try {
@@ -38,7 +39,12 @@ class DatabaseService {
 
   Future<String> addWorkout(WorkoutModel workout) async {
     try {
-      final docRef = await _firestore.collection('workouts').add(workout.toMap());
+      // Ensure the stored workout "id" matches the Firestore document ID
+      final collection = _firestore.collection('workouts');
+      final docRef = collection.doc();
+      final workoutWithId = workout.copyWith(id: docRef.id);
+
+      await docRef.set(workoutWithId.toMap());
       print('✅ Workout added: ${docRef.id}');
       return docRef.id;
     } catch (e) {
@@ -96,6 +102,21 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  // New: update workout (used by edit flow / history)
+  Future<void> updateWorkout(WorkoutModel workout) async {
+  try {
+    await _firestore
+        .collection('workouts')
+        .doc(workout.id)
+        .update(workout.toMap());
+    print('✅ Workout updated');
+  } catch (e) {
+    print('❌ Error updating workout: $e');
+    rethrow;
+  }
+}
+
 
   //  Post Method 
 
