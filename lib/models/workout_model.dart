@@ -10,9 +10,9 @@ class WorkoutModel {
   final List<Exercise> exercises;
   final int duration; // minutes
   final String visibility; // public, private
-  final String? preWorkoutPhoto; 
-  final String? postWorkoutPhoto; 
-
+  final String? preWorkoutPhoto;
+  final String? postWorkoutPhoto;
+  final String workoutType; // e.g., Gym, Home, Outdoors
 
   WorkoutModel({
     required this.id,
@@ -25,7 +25,8 @@ class WorkoutModel {
     required this.duration,
     this.visibility = 'public',
     this.preWorkoutPhoto,
-    this.postWorkoutPhoto
+    this.postWorkoutPhoto,
+    this.workoutType = 'Gym',
   });
 
   // Convert to Firestore-friendly map
@@ -40,9 +41,9 @@ class WorkoutModel {
       'exercises': exercises.map((e) => e.toMap()).toList(),
       'duration': duration,
       'visibility': visibility,
-      'preWorkoutPhoto' : preWorkoutPhoto,
-      'postWorkoutPhoto': postWorkoutPhoto,  
-
+      'preWorkoutPhoto': preWorkoutPhoto,
+      'postWorkoutPhoto': postWorkoutPhoto,
+      'workoutType': workoutType,
     };
   }
 
@@ -61,8 +62,9 @@ class WorkoutModel {
           [],
       duration: _parseInt(map['duration']),
       visibility: map['visibility'] ?? 'public',
-      preWorkoutPhoto: map['preWorkoutPhoto'],    
-      postWorkoutPhoto: map['postWorkoutPhoto'],  
+      preWorkoutPhoto: map['preWorkoutPhoto'],
+      postWorkoutPhoto: map['postWorkoutPhoto'],
+      workoutType: map['workoutType'] ?? 'Gym',
     );
   }
 
@@ -85,6 +87,9 @@ class WorkoutModel {
     List<Exercise>? exercises,
     int? duration,
     String? visibility,
+    String? preWorkoutPhoto,
+    String? postWorkoutPhoto,
+    String? workoutType,
   }) {
     return WorkoutModel(
       id: id ?? this.id,
@@ -96,6 +101,9 @@ class WorkoutModel {
       exercises: exercises ?? this.exercises,
       duration: duration ?? this.duration,
       visibility: visibility ?? this.visibility,
+      preWorkoutPhoto: preWorkoutPhoto ?? this.preWorkoutPhoto,
+      postWorkoutPhoto: postWorkoutPhoto ?? this.postWorkoutPhoto,
+      workoutType: workoutType ?? this.workoutType,
     );
   }
 
@@ -114,11 +122,21 @@ class Exercise {
   final String reps;
   final String? weight;
 
+  // Cardio-related fields
+  final bool isCardio;
+  final double? distanceMiles; // miles, optional
+  final double? speedMph; // mph, optional
+  final String? terrain; // e.g., Treadmill, Trail, Hills
+
   Exercise({
     required this.name,
     required this.sets,
     required this.reps,
     this.weight,
+    this.isCardio = false,
+    this.distanceMiles,
+    this.speedMph,
+    this.terrain,
   });
 
   Map<String, dynamic> toMap() {
@@ -127,20 +145,51 @@ class Exercise {
       'sets': sets,
       'reps': reps,
       'weight': weight,
+      'isCardio': isCardio,
+      'distanceMiles': distanceMiles,
+      'speedMph': speedMph,
+      'terrain': terrain,
     };
   }
 
   factory Exercise.fromMap(Map<String, dynamic> map) {
-    String setsStr = map['sets']?.toString() ?? '0'; 
-    String repsStr = map['reps']?.toString() ?? '0'; 
-    String? weightStr = map['weight']?.toString(); 
+    // Normalize sets / reps / weight to strings
+    final String setsStr = map['sets']?.toString() ?? '0';
+    final String repsStr = map['reps']?.toString() ?? '0';
+    final String? weightStr = map['weight']?.toString();
 
+    final bool isCardio = map['isCardio'] == true;
+
+    // Backwards compatible distance:
+    // look for distanceMiles first, then distance
+    double? distanceMiles;
+    final rawDistanceMiles = map['distanceMiles'] ?? map['distance'];
+    if (rawDistanceMiles is num) {
+      distanceMiles = rawDistanceMiles.toDouble();
+    } else if (rawDistanceMiles is String) {
+      distanceMiles = double.tryParse(rawDistanceMiles);
+    }
+
+    // Speed mph (new)
+    double? speedMph;
+    final rawSpeed = map['speedMph'] ?? map['speed'];
+    if (rawSpeed is num) {
+      speedMph = rawSpeed.toDouble();
+    } else if (rawSpeed is String) {
+      speedMph = double.tryParse(rawSpeed);
+    }
+
+    final String? terrain = map['terrain']?.toString();
 
     return Exercise(
-      name: map['name'] ?? '',
+      name: map['name']?.toString() ?? '',
       sets: setsStr,
       reps: repsStr,
-      weight: weightStr
+      weight: weightStr,
+      isCardio: isCardio,
+      distanceMiles: distanceMiles,
+      speedMph: speedMph,
+      terrain: terrain,
     );
   }
 
@@ -149,12 +198,20 @@ class Exercise {
     String? sets,
     String? reps,
     String? weight,
+    bool? isCardio,
+    double? distanceMiles,
+    double? speedMph,
+    String? terrain,
   }) {
     return Exercise(
       name: name ?? this.name,
       sets: sets ?? this.sets,
       reps: reps ?? this.reps,
       weight: weight ?? this.weight,
+      isCardio: isCardio ?? this.isCardio,
+      distanceMiles: distanceMiles ?? this.distanceMiles,
+      speedMph: speedMph ?? this.speedMph,
+      terrain: terrain ?? this.terrain,
     );
   }
 }
