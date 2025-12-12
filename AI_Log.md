@@ -292,3 +292,138 @@ Understanding how Dart infers list types is useful when debugging collection-ret
 
 Result:
 After updating the constructor reference to match the actual WorkoutModel API, the Firestore mapping logic now returns a properly typed List<WorkoutModel>, resolving both the missing member error and the type mismatch error.
+
+8.	Progress Screen Type Errors After Model Changes
+Date: 2025-12-11
+AI Tool Used: Claude (Sonnet 4.5)
+
+What Was Asked / Generated:
+Needed to fix type errors in progress_screen.dart after changing the Exercise model’s weight field from double to String to support flexible formats (e.g., "135-155-185").
+The progress screen was using numeric parsing to find the heaviest lift and compute PRs, which no longer made sense with range-based string values.
+Looked for options on how to handle stats now that direct numeric comparison isn’t reliable.
+After weighing approaches, decided to drop weight-based PR logic and focus the screen on metrics that don’t depend on parsing weight strings (frequency, volume, duration, etc.).
+
+How It Was Applied:
+Removed all _findHeaviestLift() and _computePRsByExercise() methods that depended on numeric weight parsing.
+Eliminated the “Personal Records” section and “Heaviest Lift” stat card from the UI.
+Kept core stats: total workouts, total minutes, total exercises, and this week’s workout count.
+Retained the weekly activity chart and top exercises breakdown, since they don’t rely on weight values.
+Updated the progress screen to use simple, count-based metrics compatible with the string-based exercise model.
+
+Reflection / What Was Learned:
+Any time a model field type changes, all dependent screens and services need to be revisited for compatibility.
+String fields that allow ranges (like "8-12" or "135-155-185") add flexibility but make strict numeric comparisons harder without extra parsing logic.
+Sometimes it’s better to simplify features than to bolt on fragile parsers just to keep an old stat alive.
+Workout frequency and consistency metrics can be just as valuable as max-weight PR tracking.
+
+Result:
+The progress screen now works cleanly with the string-based Exercise model, showing workout counts, duration totals, weekly activity charts, and top exercises without needing to parse numeric weights.
+
+9.	Adding Photo Upload Feature for Workout Logging
+Date: 2025-12-11
+AI Tool Used: Claude (Sonnet 4.5)
+
+What Was Asked / Generated:
+Planned a feature to let users attach pre-workout and post-workout photos when logging sessions, but it hadn’t been implemented yet.
+Needed a clean flow for picking images, uploading to Firebase Storage, and surfacing those photos in the social feed.
+Used the AI tool as a reference for wiring together image_picker, Firebase Storage uploads, and model updates.
+The resulting design included:
+	•	Adding the image_picker package
+	•	Extending WorkoutModel with preWorkoutPhoto and postWorkoutPhoto URL fields
+	•	Adding an uploadWorkoutPhoto() helper in DatabaseService
+	•	Building photo selection cards with gallery/camera options
+	•	Updating the feed to show before/after photos side-by-side
+
+How It Was Applied:
+Added image_picker: ^1.0.7 to pubspec.yaml and ran flutter pub get.
+Updated WorkoutModel with optional preWorkoutPhoto and postWorkoutPhoto string fields.
+Implemented uploadWorkoutPhoto() in DatabaseService to handle Firebase Storage uploads and return download URLs.
+Created a _PhotoCard widget in log_workout_screen.dart with tap-to-select behavior.
+Added a bottom sheet modal with options: choose from gallery, take photo, or remove photo.
+Updated the workout save flow to upload selected photos first, then include the resulting URLs in the Firestore workout document.
+Modified feed_screen.dart to render side-by-side comparison photos when present.
+
+Reflection / What Was Learned:
+Firebase Storage needs tight security rules so users can only write to their own folders.
+image_picker provides a unified API for both gallery and camera, which simplifies the UI logic.
+Uploading images before writing the workout document ensures URLs are ready when saving to Firestore.
+Making photo fields optional keeps the feature additive—logging still works even if users never upload pictures.
+Side-by-side before/after photos support a more visual “transformation” story that fits fitness tracking well.
+
+Result:
+Users can now optionally attach pre- and post-workout photos to logged sessions. Images are stored in Firebase Storage, URLs are saved in the workout documents, and the social feed shows comparison photos when available.
+
+10.	Replacing Auto-Duration Calculation with Manual Input
+Date: 2025-12-11
+AI Tool Used: Claude (Sonnet 4.5)
+
+What Was Asked / Generated:
+Wanted to remove the rough auto-duration estimate (totalSets × 2 minutes) and let users enter the actual workout duration instead.
+Needed a simple, validated duration input field (in minutes) with good UX and basic error handling.
+Used the AI tool as a reference while refactoring log_workout_screen.dart to support manual duration entry.
+
+How It Was Applied:
+Created a _durationController and added it to the widget’s dispose() method.
+Added a TextField for duration with keyboardType: TextInputType.number and a timer icon at the top of the form.
+Updated _saveWorkout() to validate that duration is present, numeric, and positive.
+Replaced the _estimateDuration() call with int.parse(_durationController.text) once validation passes.
+Included duration in the form reset logic so it clears after a successful save.
+Added helper text (“How long was your workout?”) to clarify what the field represents.
+
+Reflection / What Was Learned:
+Set-based estimation is convenient but doesn’t capture warmups, supersets, or varying rest times very well.
+Manual input gives a more accurate reflection of actual time spent, which improves progress tracking.
+For numeric fields, using a numeric keyboard reduces friction and prevents most invalid characters.
+Validation on the client side helps keep the database clean and prevents garbage values from slipping in.
+
+Result:
+The workout logging screen now requires users to manually enter workout duration in minutes, providing more accurate data and removing the old, oversimplified auto-estimation.
+
+11.	Implementing Light/Dark Theme Switching
+Date: 2025-12-11
+AI Tool Used: Claude (Sonnet 4.5)
+
+What Was Asked / Generated:
+Needed app-wide light/dark theme switching with persistent user preferences.
+Wanted a clean setup with a theme provider, Material 3 theme definitions, and a simple toggle in the profile screen (including system-default support).
+Used the AI tool as a guide while designing the provider pattern and theme structure.
+
+How It Was Applied:
+Added shared_preferences: ^2.2.2 and ran flutter pub get.
+Created lib/providers/theme_provider.dart using ChangeNotifier with methods to load, toggle, and persist theme selection.
+Built lib/theme/app_theme.dart with Material 3 lightTheme and darkTheme definitions for consistent styling.
+Updated main.dart to wrap the app in MultiProvider and include ChangeNotifierProvider(create: (_) => ThemeProvider()).
+Wrapped MaterialApp in a Consumer<ThemeProvider> so theme changes propagate reactively.
+Added a SwitchListTile in the profile screen for quick dark mode toggling.
+Created a settings bottom sheet with radio options for Light / Dark / System Default.
+
+Reflection / What Was Learned:
+SharedPreferences is a straightforward way to persist lightweight settings like theme choice.
+The ChangeNotifier + Provider pattern keeps theme state centralized and reactive.
+Material Design 3 color schemes (e.g., onSurface, surfaceContainerHighest) naturally adapt to both light and dark modes.
+Offering a “System Default” option respects user preferences at the OS level while still allowing overrides.
+
+Result:
+The app now supports light mode, dark mode, and system-default themes. User selection is stored locally and persists across sessions, with theme changes applying instantly throughout the UI.
+
+12.	Fixing Dark Mode Contrast in Progress Screen
+Date: 2025-12-11
+AI Tool Used: Claude (Sonnet 4.5)
+
+What Was Asked / Generated:
+Noticed that the progress screen looked bad in dark mode because it relied on hardcoded light backgrounds (Colors.grey[100]) and low-contrast text.
+Exercise breakdown cards and the weekly activity chart were almost white in dark mode, making text hard to read.
+Looked for a better approach that would let the screen adapt automatically to both light and dark themes.
+
+How It Was Applied:
+Used final isDark = Theme.of(context).brightness == Brightness.dark; to detect the current theme.
+Replaced hardcoded Colors.grey[100] backgrounds with Theme.of(context).colorScheme.surfaceContainerHighest or surfaceContainerLow.
+Swapped text colors from Colors.grey[600] to Theme.of(context).colorScheme.onSurfaceVariant.
+Updated chart label and axis colors to use theme-aware values instead of fixed black/gray.
+Ensured icons and text use semantic tokens like onPrimaryContainer and onSurface for consistent contrast.
+
+Reflection / What Was Learned:
+Hardcoded grayscale values don’t adapt to dark mode and easily break accessibility.
+Material Design 3’s semantic color roles are designed specifically to keep contrast usable in both light and dark themes.
+Tapping into Theme.of(context).colorScheme ties the UI to the active theme instead of one-off color hacks.
+Good dark mode support is about contrast and hierarchy, not just inverting colors.
