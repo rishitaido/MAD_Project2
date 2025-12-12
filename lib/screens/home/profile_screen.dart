@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/user_model.dart';
-import '../../models/workout_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
+import '../../providers/theme_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -11,8 +10,8 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final user = authService.currentUser;
-    final dbService = DatabaseService();
 
     if (user == null) {
       return const Scaffold(
@@ -20,179 +19,142 @@ class ProfileScreen extends StatelessWidget {
       );
     }
 
+    final dbService = DatabaseService();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit profile coming in Week 3!')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authService.signOut();
-            },
+            icon: const Icon(Icons.settings),
+            onPressed: () => _showSettingsSheet(context, themeProvider),
           ),
         ],
       ),
-      body: FutureBuilder<UserModel?>(
+      body: FutureBuilder(
         future: dbService.getUserData(user.uid),
-        builder: (context, userSnapshot) {
-          if (userSnapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = userSnapshot.data;
+          final userData = snapshot.data;
 
           return SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 24),
-                // Profile picture
+                // Profile photo
                 CircleAvatar(
-                  radius: 60,
-                  backgroundImage: userData?.profilePhoto != null
-                      ? NetworkImage(userData!.profilePhoto!)
-                      : null,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primaryContainer,
-                  child: userData?.profilePhoto == null
-                      ? Text(
-                          userData?.name.substring(0, 1).toUpperCase() ?? 'U',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineLarge
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
+                  radius: 50,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: userData?.profilePhoto != null
+                      ? ClipOval(
+                          child: Image.network(
+                            userData!.profilePhoto!,
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          ),
                         )
-                      : null,
+                      : Icon(
+                          Icons.person,
+                          size: 50,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   userData?.name ?? 'User',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 4),
                 Text(
                   user.email ?? '',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
                 ),
-                if (userData?.bio != null && userData!.bio!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      userData.bio!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[700]),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 24),
 
-                // Stats
+                // Stats cards
                 FutureBuilder<int>(
                   future: dbService.getUserWorkoutCount(user.uid),
-                  builder: (context, countSnapshot) {
-                    final workoutCount = countSnapshot.data ?? 0;
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _StatCard(
-                          label: 'Workouts',
-                          value: workoutCount.toString(),
-                        ),
-                        _StatCard(
-                          label: 'Streak',
-                          value: '0', // TODO: Calculate streak
-                        ),
-                        _StatCard(
-                          label: 'Followers',
-                          value: '0', // TODO: Implement followers
-                        ),
-                      ],
+                  builder: (context, workoutSnapshot) {
+                    final workoutCount = workoutSnapshot.data ?? 0;
+                    
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _StatCard(
+                              icon: Icons.fitness_center,
+                              label: 'Workouts',
+                              value: workoutCount.toString(),
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _StatCard(
+                              icon: Icons.local_fire_department,
+                              label: 'Streak',
+                              value: '0',
+                              color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _StatCard(
+                              icon: Icons.people,
+                              label: 'Followers',
+                              value: '0',
+                              color: Colors.purple,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
                 const SizedBox(height: 24),
-                const Divider(),
 
-                // Recent workouts
+                // Theme toggle card
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Recent Workouts',
-                      style: Theme.of(context).textTheme.titleLarge,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Card(
+                    child: SwitchListTile(
+                      title: const Text('Dark Mode'),
+                      subtitle: Text(
+                        themeProvider.isDarkMode ? 'Enabled' : 'Disabled',
+                      ),
+                      secondary: Icon(
+                        themeProvider.isDarkMode
+                            ? Icons.dark_mode
+                            : Icons.light_mode,
+                      ),
+                      value: themeProvider.isDarkMode,
+                      onChanged: (_) => themeProvider.toggleTheme(),
                     ),
                   ),
                 ),
-                StreamBuilder<List<WorkoutModel>>(
-                  stream: dbService.getUserWorkouts(user.uid),
-                  builder: (context, workoutSnapshot) {
-                    if (workoutSnapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+                const SizedBox(height: 16),
 
-                    final workouts = workoutSnapshot.data ?? [];
-
-                    if (workouts.isEmpty) {
-                      return Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          'No workouts yet. Start logging!',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: workouts.length,
-                      itemBuilder: (context, index) {
-                        final workout = workouts[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primaryContainer,
-                            child: Icon(
-                              Icons.fitness_center,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                            ),
-                          ),
-                          title: Text(
-                            '${workout.exercises.length} exercises',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${workout.duration} min • ${workout.date.toString().split(' ')[0]}',
-                          ),
-                          trailing: Icon(
-                            workout.visibility == 'public'
-                                ? Icons.public
-                                : Icons.lock,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                        );
-                      },
-                    );
-                  },
+                // Sign out button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await authService.signOut();
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign Out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -201,36 +163,111 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showSettingsSheet(BuildContext context, ThemeProvider themeProvider) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Theme Settings',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Light Mode'),
+              subtitle: const Text('Always use light theme'),
+              value: ThemeMode.light,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Dark Mode'),
+              subtitle: const Text('Always use dark theme'),
+              value: ThemeMode.dark,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('System Default'),
+              subtitle: const Text('Follow device settings'),
+              value: ThemeMode.system,
+              groupValue: themeProvider.themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  themeProvider.setThemeMode(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
+  final Color color;
 
   const _StatCard({
+    required this.icon,
     required this.label,
     required this.value,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 14,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
           ),
-        ),
-      ],
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

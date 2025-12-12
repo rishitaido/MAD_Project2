@@ -13,6 +13,7 @@ class ProgressScreen extends StatelessWidget {
     final authService = Provider.of<AuthService>(context);
     final userId = authService.currentUser?.uid ?? '';
     final dbService = DatabaseService();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -35,7 +36,7 @@ class ProgressScreen extends StatelessWidget {
                   Icon(
                     Icons.insights_outlined,
                     size: 80,
-                    color: Colors.grey[400],
+                    color: Theme.of(context).colorScheme.outline,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -45,7 +46,9 @@ class ProgressScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Start logging workouts to see your progress',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -117,7 +120,9 @@ class ProgressScreen extends StatelessWidget {
                   height: 200,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: isDark
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: _WeeklyChart(workouts: workouts),
@@ -182,7 +187,7 @@ class _StatCard extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey[700],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
             ),
             textAlign: TextAlign.center,
@@ -201,6 +206,7 @@ class _WeeklyChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weekData = _getWeekData();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BarChart(
       BarChartData(
@@ -216,7 +222,10 @@ class _WeeklyChart extends StatelessWidget {
                 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                 return Text(
                   days[value.toInt()],
-                  style: const TextStyle(fontSize: 12),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 );
               },
             ),
@@ -288,13 +297,17 @@ class _ExerciseBreakdown extends StatelessWidget {
     final sortedExercises = exerciseCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       children: sortedExercises.take(5).map((entry) {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
+            color: isDark
+                ? Theme.of(context).colorScheme.surfaceContainerHighest
+                : Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -315,7 +328,10 @@ class _ExerciseBreakdown extends StatelessWidget {
               Expanded(
                 child: Text(
                   entry.key,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
               Text(
