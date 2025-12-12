@@ -140,6 +140,34 @@ class PostCard extends StatelessWidget {
     }
   }
 
+  String _formatCardioSubtitle(Exercise exercise) {
+    final parts = <String>['Cardio'];
+
+    if (exercise.distanceMiles != null) {
+      parts.add('${exercise.distanceMiles} mi');
+    }
+
+    // Speed (mph)
+    if (exercise.speedMph != null) {
+      parts.add('${exercise.speedMph} mph');
+    }
+
+    if (exercise.terrain != null && exercise.terrain!.trim().isNotEmpty) {
+      parts.add(exercise.terrain!.trim());
+    }
+
+    return parts.join(' • ');
+  }
+
+  String _formatStrengthSubtitle(Exercise exercise) {
+    return '${exercise.sets} sets × ${exercise.reps} reps'
+        '${exercise.weight != null && exercise.weight!.trim().isNotEmpty ? ' @ ${exercise.weight}lbs' : ''}';
+  }
+
+  IconData _exerciseIcon(Exercise exercise) {
+    return exercise.isCardio ? Icons.directions_run : Icons.fitness_center;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
@@ -162,9 +190,7 @@ class PostCard extends StatelessWidget {
                   ? Text(
                       post.userName.substring(0, 1).toUpperCase(),
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onPrimaryContainer,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                     )
                   : null,
@@ -266,26 +292,33 @@ class PostCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Exercises
-                    ...workout.exercises.map((exercise) => Padding(
+                    ...workout.exercises.map(
+                      (exercise) {
+                        final subtitle = exercise.isCardio
+                            ? _formatCardioSubtitle(exercise)
+                            : _formatStrengthSubtitle(exercise);
+
+                        return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
                               Icon(
-                                Icons.fitness_center,
+                                _exerciseIcon(exercise),
                                 size: 16,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  '${exercise.name} • ${exercise.sets}×${exercise.reps}'
-                                  '${exercise.weight != null ? ' @ ${exercise.weight}lbs' : ''}',
+                                  '${exercise.name} • $subtitle',
                                   style: const TextStyle(fontSize: 14),
                                 ),
                               ),
                             ],
                           ),
-                        )),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       '${workout.duration} min • ${workout.exercises.length} exercises',

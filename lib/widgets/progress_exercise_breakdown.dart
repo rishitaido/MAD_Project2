@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../models/workout_model.dart';
+import '../models/workout_model.dart';
 
 class ProgressExerciseBreakdown extends StatelessWidget {
   final List<WorkoutModel> workouts;
@@ -12,11 +12,20 @@ class ProgressExerciseBreakdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final exerciseCounts = <String, int>{};
+    final exerciseIsCardio = <String, bool>{};
 
-    for (var workout in workouts) {
-      for (var exercise in workout.exercises) {
-        exerciseCounts[exercise.name] =
-            (exerciseCounts[exercise.name] ?? 0) + 1;
+    for (final workout in workouts) {
+      for (final exercise in workout.exercises) {
+        final name = exercise.name;
+
+        exerciseCounts[name] = (exerciseCounts[name] ?? 0) + 1;
+
+        // If we ever logged this exercise name as cardio, remember it
+        if (exercise.isCardio) {
+          exerciseIsCardio[name] = true;
+        } else {
+          exerciseIsCardio[name] = exerciseIsCardio[name] ?? false;
+        }
       }
     }
 
@@ -24,21 +33,21 @@ class ProgressExerciseBreakdown extends StatelessWidget {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: sortedExercises.take(5).map((entry) {
+        final name = entry.key;
+        final count = entry.value;
+        final isCardio = exerciseIsCardio[name] == true;
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDark
-                ? colorScheme.surfaceContainerHighest
-                : colorScheme.surfaceContainerLow,
+                ? Theme.of(context).colorScheme.surfaceContainerHighest
+                : Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
-            ),
           ),
           child: Row(
             children: [
@@ -46,28 +55,33 @@ class ProgressExerciseBreakdown extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  Icons.fitness_center,
-                  color: colorScheme.onPrimaryContainer,
+                  isCardio ? Icons.directions_run : Icons.fitness_center,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  entry.key,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(
-                '${entry.value}x',
+                '${count}x',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
               ),

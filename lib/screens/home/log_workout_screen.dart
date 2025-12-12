@@ -1,13 +1,20 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
 import '../../models/workout_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_service.dart';
 
 class LogWorkoutScreen extends StatefulWidget {
-  const LogWorkoutScreen({super.key});
+  const LogWorkoutScreen({
+    super.key,
+    this.existingWorkout,
+  });
+
+  final WorkoutModel? existingWorkout;
 
   @override
   State<LogWorkoutScreen> createState() => _LogWorkoutScreenState();
@@ -15,28 +22,68 @@ class LogWorkoutScreen extends StatefulWidget {
 
 class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
   final _captionController = TextEditingController();
-  final _durationController = TextEditingController(); // NEW
+  final _titleController = TextEditingController();
+  final _durationController = TextEditingController();
   final _exerciseNameController = TextEditingController();
   final _setsController = TextEditingController();
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
-  
+
+  // Cardio-specific controllers (distance + speed + terrain)
+  final _distanceController = TextEditingController();
+  final _speedController = TextEditingController();
+  final _terrainController = TextEditingController();
+
   final List<Exercise> _exercises = [];
   final ImagePicker _picker = ImagePicker();
-  
+
   File? _preWorkoutImage;
   File? _postWorkoutImage;
   bool _isLoading = false;
   String _visibility = 'public';
 
+  // Editing state
+  WorkoutModel? _editingWorkout;
+  String? _existingPrePhotoUrl;
+  String? _existingPostPhotoUrl;
+
+  // Cardio toggle for the "Add Exercise" form
+  bool _isCardio = false;
+
+  bool get _isEditing => _editingWorkout != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // If editing, preload workout data into the form
+    if (widget.existingWorkout != null) {
+      _editingWorkout = widget.existingWorkout;
+      final w = widget.existingWorkout!;
+
+      _titleController.text = w.title ?? '';
+      _durationController.text = w.duration.toString();
+      _visibility = w.visibility;
+      _exercises.addAll(w.exercises.map((e) => e.copyWith()));
+
+      _existingPrePhotoUrl = w.preWorkoutPhoto;
+      _existingPostPhotoUrl = w.postWorkoutPhoto;
+      // Caption lives on PostModel, so we leave caption empty here
+    }
+  }
+
   @override
   void dispose() {
     _captionController.dispose();
-    _durationController.dispose(); // NEW
+    _titleController.dispose();
+    _durationController.dispose();
     _exerciseNameController.dispose();
     _setsController.dispose();
     _repsController.dispose();
     _weightController.dispose();
+    _distanceController.dispose();
+    _speedController.dispose();
+    _terrainController.dispose();
     super.dispose();
   }
 
@@ -66,8 +113,9 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
   }
 
   void _showPhotoOptions(bool isPreWorkout) {
-    final hasImage = isPreWorkout ? _preWorkoutImage != null : _postWorkoutImage != null;
-    
+    final hasImage =
+        isPreWorkout ? _preWorkoutImage != null : _postWorkoutImage != null;
+
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -112,25 +160,94 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
   }
 
   void _addExercise() {
-    if (_exerciseNameController.text.isEmpty ||
-        _setsController.text.isEmpty ||
-        _repsController.text.isEmpty) {
-      _showError('Please fill in exercise name, sets, and reps', isWarning: true);
+    final name = _exerciseNameController.text.trim();
+
+    if (name.isEmpty) {
+      _showError('Please enter an exercise name', isWarning: true);
       return;
     }
 
-    setState(() {
-      _exercises.add(Exercise(
-        name: _exerciseNameController.text.trim(),
-        sets: _setsController.text.trim(),
-        reps: _repsController.text.trim(),
-        weight: _weightController.text.isNotEmpty ? _weightController.text.trim() : null,
-      ));
+    if (_isCardio) {
+      // Cardio: distance + speed + terrain
+      final distanceText = _distanceController.text.trim();
+      final speedText = _speedController.text.trim();
+      final terrainText = _terrainController.text.trim();
 
-      _exerciseNameController.clear();
-      _setsController.clear();
-      _repsController.clear();
-      _weightController.clear();
+      final distance =
+          distanceText.isNotEmpty ? double.tryParse(distanceText) : null;
+      final speed =
+          speedText.isNotEmpty ? double.tryParse(speedText) : null;
+      final hasTerrain = terrainText.isNotEmpty;
+
+      if (distance == null && speed == null && !hasTerrain) {
+        _showError(
+          'For cardio, add distance, speed, or terrain',
+          isWarning: true,
+        );
+        return;
+      }
+
+      setState(() {
+        _exercises.add(
+          Exercise(
+            name: name,
+            // strength fields are unused for cardio; store neutral values
+            sets: '0',
+            reps: '0',
+            weight: null,
+            isCardio: true,
+            distanceMiles: distance,
+            speedMph: speed,
+            terrain: hasTerrain ? terrainText : null,
+          ),
+        );
+
+        _exerciseNameController.clear();
+        _setsController.clear();
+        _repsController.clear();
+        _weightController.clear();
+        _distanceController.clear();
+        _speedController.clear();
+        _terrainController.clear();
+        _isCardio = false;
+      });
+    } else {
+      // Strength: require sets/reps, weight optional
+      final setsText = _setsController.text.trim();
+      final repsText = _repsController.text.trim();
+
+      if (setsText.isEmpty || repsText.isEmpty) {
+        _showError('Please enter sets and reps', isWarning: true);
+        return;
+      }
+
+      final weightText = _weightController.text.trim();
+      final weight = weightText.isNotEmpty ? weightText : null;
+
+      setState(() {
+        _exercises.add(
+          Exercise(
+            name: name,
+            sets: setsText,
+            reps: repsText,
+            weight: weight,
+          ),
+        );
+
+        _exerciseNameController.clear();
+        _setsController.clear();
+        _repsController.clear();
+        _weightController.clear();
+        _distanceController.clear();
+        _speedController.clear();
+        _terrainController.clear();
+      });
+    }
+  }
+
+  void _removeExercise(int index) {
+    setState(() {
+      _exercises.removeAt(index);
     });
   }
 
@@ -152,6 +269,10 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
       return;
     }
 
+    final titleText = _titleController.text.trim().isEmpty
+        ? null
+        : _titleController.text.trim();
+
     setState(() => _isLoading = true);
 
     try {
@@ -162,47 +283,87 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
       final dbService = DatabaseService();
       final userData = await dbService.getUserData(user.uid);
 
-      // Upload photos
-      final prePhotoUrl = _preWorkoutImage != null
-          ? await dbService.uploadWorkoutPhoto(user.uid, _preWorkoutImage!)
-          : null;
-      
-      final postPhotoUrl = _postWorkoutImage != null
-          ? await dbService.uploadWorkoutPhoto(user.uid, _postWorkoutImage!)
-          : null;
+      // Upload photos (if new ones were selected)
+      String? prePhotoUrl = _existingPrePhotoUrl;
+      String? postPhotoUrl = _existingPostPhotoUrl;
 
-      // Create workout
-      final workout = WorkoutModel(
-        id: '',
-        userId: user.uid,
-        userName: userData?.name ?? 'User',
-        userPhoto: userData?.profilePhoto,
-        date: DateTime.now(),
-        exercises: _exercises,
-        duration: duration, // Use manual input
-        visibility: _visibility,
-        preWorkoutPhoto: prePhotoUrl,
-        postWorkoutPhoto: postPhotoUrl,
-      );
+      if (_preWorkoutImage != null) {
+        prePhotoUrl =
+            await dbService.uploadWorkoutPhoto(user.uid, _preWorkoutImage!);
+      }
+      if (_postWorkoutImage != null) {
+        postPhotoUrl =
+            await dbService.uploadWorkoutPhoto(user.uid, _postWorkoutImage!);
+      }
 
-      final workoutId = await dbService.addWorkout(workout);
+      if (_isEditing) {
+        // 🔁 Update existing workout
+        final original = _editingWorkout!;
+        final updated = original.copyWith(
+          title: titleText,
+          exercises: List<Exercise>.from(_exercises),
+          duration: duration,
+          visibility: _visibility,
+        );
 
-      // Create post if public
-      if (_visibility == 'public') {
-        await dbService.createPost(
-          workoutId: workoutId,
+        // Rebuild with photos included
+        final updatedWithPhotos = WorkoutModel(
+          id: updated.id,
+          userId: updated.userId,
+          userName: updated.userName,
+          userPhoto: updated.userPhoto,
+          title: updated.title,
+          date: updated.date,
+          exercises: updated.exercises,
+          duration: updated.duration,
+          visibility: updated.visibility,
+          preWorkoutPhoto: prePhotoUrl,
+          postWorkoutPhoto: postPhotoUrl,
+        );
+
+        await dbService.updateWorkout(updatedWithPhotos);
+
+        if (mounted) {
+          _showSuccess('Workout updated!');
+          Navigator.of(context).pop(); // go back to previous screen
+        }
+      } else {
+        // ➕ Create new workout
+        final workout = WorkoutModel(
+          id: '',
           userId: user.uid,
           userName: userData?.name ?? 'User',
           userPhoto: userData?.profilePhoto,
-          caption: _captionController.text.isNotEmpty ? _captionController.text : null,
+          title: titleText,
+          date: DateTime.now(),
+          exercises: _exercises,
+          duration: duration,
+          visibility: _visibility,
+          preWorkoutPhoto: prePhotoUrl,
+          postWorkoutPhoto: postPhotoUrl,
         );
-      }
 
-      await dbService.updateChallengeProgress(user.uid);
+        final workoutId = await dbService.addWorkout(workout);
 
-      if (mounted) {
-        _showSuccess('Workout logged successfully! 💪');
-        _clearForm();
+        // Create post if public
+        if (_visibility == 'public') {
+          await dbService.createPost(
+            workoutId: workoutId,
+            userId: user.uid,
+            userName: userData?.name ?? 'User',
+            userPhoto: userData?.profilePhoto,
+            caption: _captionController.text.isNotEmpty
+                ? _captionController.text
+                : null,
+          );
+        }
+
+        await dbService.updateChallengeProgress(user.uid);
+
+        if (mounted) {
+          _showSuccess('Workout logged successfully! 💪');
+          _clearForm();
+        }
       }
     } catch (e) {
       if (mounted) _showError('Error: $e');
@@ -215,10 +376,22 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
     setState(() {
       _exercises.clear();
       _captionController.clear();
-      _durationController.clear(); // NEW
+      _titleController.clear();
+      _durationController.clear();
       _visibility = 'public';
       _preWorkoutImage = null;
       _postWorkoutImage = null;
+      _editingWorkout = null;
+      _existingPrePhotoUrl = null;
+      _existingPostPhotoUrl = null;
+      _exerciseNameController.clear();
+      _setsController.clear();
+      _repsController.clear();
+      _weightController.clear();
+      _distanceController.clear();
+      _speedController.clear();
+      _terrainController.clear();
+      _isCardio = false;
     });
   }
 
@@ -239,9 +412,11 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final titleText = _isEditing ? 'Edit Workout' : 'Log Workout';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Log Workout'),
+        title: Text(titleText),
         actions: [
           if (_exercises.isNotEmpty)
             TextButton(
@@ -283,38 +458,73 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Duration input - NEW
+            // Workout title
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Workout Title (optional)',
+                hintText: 'e.g., Push Day, Leg Day',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Duration input
             TextField(
               controller: _durationController,
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Workout Duration (minutes)',
                 hintText: 'e.g., 45',
-                prefixIcon: const Icon(Icons.timer),
-                border: const OutlineInputBorder(),
-                helperText: 'How long was your workout?',
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
 
             // Exercise list
             if (_exercises.isNotEmpty) ...[
-              Text('Exercises (${_exercises.length})', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Exercises (${_exercises.length})',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 12),
               ..._exercises.asMap().entries.map((entry) {
                 final exercise = entry.value;
                 final index = entry.key;
+
+                String subtitle;
+                if (exercise.isCardio == true) {
+                  final parts = <String>[];
+                  if (exercise.distanceMiles != null) {
+                    parts.add('${exercise.distanceMiles} mi');
+                  }
+                  if (exercise.speedMph != null) {
+                    parts.add('${exercise.speedMph} mph');
+                  }
+                  if (exercise.terrain != null &&
+                      exercise.terrain!.trim().isNotEmpty) {
+                    parts.add(exercise.terrain!.trim());
+                  }
+                  subtitle = parts.isEmpty
+                      ? 'Cardio'
+                      : 'Cardio • ${parts.join(' • ')}';
+                } else {
+                  subtitle =
+                      '${exercise.sets} sets × ${exercise.reps} reps'
+                      '${exercise.weight != null && exercise.weight!.isNotEmpty ? ' @ ${exercise.weight}lbs' : ''}';
+                }
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    title: Text(exercise.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(
-                      '${exercise.sets} sets × ${exercise.reps} reps'
-                      '${exercise.weight != null ? ' @ ${exercise.weight}lbs' : ''}',
+                    title: Text(
+                      exercise.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
+                    subtitle: Text(subtitle),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
-                      onPressed: () => setState(() => _exercises.removeAt(index)),
+                      onPressed: () => _removeExercise(index),
                     ),
                   ),
                 );
@@ -328,6 +538,26 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
               setsController: _setsController,
               repsController: _repsController,
               weightController: _weightController,
+              distanceController: _distanceController,
+              speedController: _speedController,
+              terrainController: _terrainController,
+              isCardio: _isCardio,
+              onCardioChanged: (value) {
+                setState(() {
+                  _isCardio = value;
+                  if (value) {
+                    // Clear strength fields when switching to cardio
+                    _setsController.clear();
+                    _repsController.clear();
+                    _weightController.clear();
+                  } else {
+                    // Clear cardio fields when switching back
+                    _distanceController.clear();
+                    _speedController.clear();
+                    _terrainController.clear();
+                  }
+                });
+              },
               onAdd: _addExercise,
             ),
             const SizedBox(height: 24),
@@ -346,18 +576,33 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
               const SizedBox(height: 16),
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'public', label: Text('Public'), icon: Icon(Icons.public)),
-                  ButtonSegment(value: 'private', label: Text('Private'), icon: Icon(Icons.lock)),
+                  ButtonSegment(
+                    value: 'public',
+                    label: Text('Public'),
+                    icon: Icon(Icons.public),
+                  ),
+                  ButtonSegment(
+                    value: 'private',
+                    label: Text('Private'),
+                    icon: Icon(Icons.lock),
+                  ),
                 ],
                 selected: {_visibility},
-                onSelectionChanged: (newSelection) => setState(() => _visibility = newSelection.first),
+                onSelectionChanged: (newSelection) =>
+                    setState(() => _visibility = newSelection.first),
               ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _isLoading ? null : _saveWorkout,
-                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child: _isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Save Workout'),
               ),
             ],
@@ -374,6 +619,11 @@ class _ExerciseForm extends StatelessWidget {
   final TextEditingController setsController;
   final TextEditingController repsController;
   final TextEditingController weightController;
+  final TextEditingController distanceController;
+  final TextEditingController speedController;
+  final TextEditingController terrainController;
+  final bool isCardio;
+  final ValueChanged<bool> onCardioChanged;
   final VoidCallback onAdd;
 
   const _ExerciseForm({
@@ -381,6 +631,11 @@ class _ExerciseForm extends StatelessWidget {
     required this.setsController,
     required this.repsController,
     required this.weightController,
+    required this.distanceController,
+    required this.speedController,
+    required this.terrainController,
+    required this.isCardio,
+    required this.onCardioChanged,
     required this.onAdd,
   });
 
@@ -398,16 +653,19 @@ class _ExerciseForm extends StatelessWidget {
               controller: nameController,
               decoration: const InputDecoration(
                 labelText: 'Exercise Name',
-                hintText: 'e.g., Bench Press',
+                hintText: 'e.g., Bench Press, Run',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
+
+            // Strength metrics (disabled when cardio)
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: setsController,
+                    enabled: !isCardio,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Sets',
@@ -420,6 +678,7 @@ class _ExerciseForm extends StatelessWidget {
                 Expanded(
                   child: TextField(
                     controller: repsController,
+                    enabled: !isCardio,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Reps',
@@ -433,6 +692,7 @@ class _ExerciseForm extends StatelessWidget {
             const SizedBox(height: 12),
             TextField(
               controller: weightController,
+              enabled: !isCardio,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Weight (lbs) - Optional',
@@ -440,6 +700,47 @@ class _ExerciseForm extends StatelessWidget {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Cardio toggle
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('This is a cardio exercise'),
+              value: isCardio,
+              onChanged: onCardioChanged,
+            ),
+
+            // Cardio-specific fields (distance + speed + terrain)
+            if (isCardio) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: distanceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Distance (mi)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: speedController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Speed (mph) - Optional',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: terrainController,
+                decoration: const InputDecoration(
+                  labelText: 'Terrain / Environment - Optional',
+                  hintText: 'e.g., Treadmill, Trail, Hills',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onAdd,
@@ -458,7 +759,11 @@ class _PhotoCard extends StatelessWidget {
   final File? image;
   final VoidCallback onTap;
 
-  const _PhotoCard({required this.label, required this.image, required this.onTap});
+  const _PhotoCard({
+    required this.label,
+    required this.image,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -475,11 +780,16 @@ class _PhotoCard extends StatelessWidget {
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey[400]),
+                  Icon(Icons.add_photo_alternate,
+                      size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 8),
                   Text(label, style: TextStyle(color: Colors.grey[600])),
                   const SizedBox(height: 4),
-                  Text('Optional', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                  Text(
+                    'Optional',
+                    style:
+                        TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
                 ],
               )
             : ClipRRect(
@@ -492,12 +802,19 @@ class _PhotoCard extends StatelessWidget {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                     ),
                   ],
