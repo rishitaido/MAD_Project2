@@ -126,6 +126,7 @@ class DatabaseService {
     required String userName,
     String? userPhoto,
     String? caption,
+    String? title,
   }) async {
     try {
       final post = {
@@ -134,6 +135,7 @@ class DatabaseService {
         'userName': userName,
         'userPhoto': userPhoto,
         'caption': caption,
+        'title': title,
         'timestamp': FieldValue.serverTimestamp(),
         'likes': [],
         'commentCount': 0,
