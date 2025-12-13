@@ -427,3 +427,30 @@ Hardcoded grayscale values don’t adapt to dark mode and easily break accessibi
 Material Design 3’s semantic color roles are designed specifically to keep contrast usable in both light and dark themes.
 Tapping into Theme.of(context).colorScheme ties the UI to the active theme instead of one-off color hacks.
 Good dark mode support is about contrast and hierarchy, not just inverting colors.
+
+13. Android Install Failure Causing Repeated Sign-In
+
+Date: 2025-12-13
+AI Tool Used: ChatGPT (GPT-5.1)
+
+What Was Asked / Generated:
+	•	Reported an issue where the app required signing in every time it was re-run.
+	•	Observed an Android installation error during app launch:
+“INSTALL_FAILED_INSUFFICIENT_STORAGE: Failed to override installation location.”
+	•	Asked why the app was failing to reinstall correctly and whether this was related to authentication persistence.
+	•	AI explained that the emulator/device had insufficient storage, preventing the debug APK from installing properly and causing inconsistent app state.
+
+How It Was Applied:
+	•	Opened Android Studio’s Device Manager and selected the affected emulator.
+	•	Performed a Wipe Data operation to clear stored apps, cache, and free internal storage.
+	•	Re-ran the application after wiping the emulator data.
+	•	Confirmed that the APK installed successfully and the app launched cleanly.
+
+Reflection / What Was Learned:
+	•	Insufficient emulator storage can prevent APK updates and lead to misleading symptoms, such as repeated login prompts.
+	•	Installation errors should be resolved before investigating higher-level issues like authentication persistence.
+	•	Wiping emulator data is an effective way to reset corrupted or storage-constrained emulator environments during development.
+	•	Stable installation behavior is necessary for accurately testing login and session persistence.
+
+Result:
+After wiping the emulator data, the installation error was resolved. The app now installs cleanly on each run, and authentication state persists correctly between launches.
