@@ -355,6 +355,9 @@ class _LogWorkoutScreenState extends State<LogWorkoutScreen> {
             caption: _captionController.text.isNotEmpty
                 ? _captionController.text
                 : null,
+            title: _titleController.text.isNotEmpty
+                ? _titleController.text
+                : null,
           );
         }
 

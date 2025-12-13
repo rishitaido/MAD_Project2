@@ -199,7 +199,24 @@ class PostCard extends StatelessWidget {
               post.userName,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text(_getTimeAgo(post.timestamp)),
+            subtitle: Row(
+              children: [
+                Text(_getTimeAgo(post.timestamp)),
+                if (post.title != null && post.title!.isNotEmpty) ...[
+                  const Text(' • '),
+                  Expanded(
+                    child: Text(
+                      post.title!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
             trailing: currentUserId == post.userId
                 ? PopupMenuButton<String>(
                     onSelected: (value) async {
