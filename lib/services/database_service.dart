@@ -356,4 +356,92 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  Future<String> uploadProfilePhoto(String userId, File imageFile) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final ref = _storage
+          .ref()
+          .child('profile_photos')
+          .child(userId)
+          .child('$timestamp.jpg');
+
+      await ref.putFile(imageFile);
+      final url = await ref.getDownloadURL();
+      
+      print('✅ Profile photo uploaded');
+      return url;
+    } catch (e) {
+      print('❌ Error uploading profile photo: $e');
+      rethrow;
+    }
+  }
+
+  // Workout Streak Calculation
+  Future<int> getUserWorkoutStreak(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('workouts')
+          .where('userId', isEqualTo: userId)
+          .orderBy('date', descending: true)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return 0;
+      }
+
+      final workouts = snapshot.docs
+          .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      // Get unique workout dates (ignore time, just consider the day)
+      final workoutDates = workouts
+          .map((w) => DateTime(w.date.year, w.date.month, w.date.day))
+          .toSet()
+          .toList();
+      
+      workoutDates.sort((a, b) => b.compareTo(a)); // Sort descending
+
+      if (workoutDates.isEmpty) {
+        return 0;
+      }
+
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final yesterdayDate = todayDate.subtract(const Duration(days: 1));
+
+      // Check if the most recent workout was today or yesterday
+      // If it's older than yesterday, streak is broken
+      final mostRecentDate = workoutDates.first;
+      if (mostRecentDate.isBefore(yesterdayDate)) {
+        return 0;
+      }
+
+      // Count consecutive days
+      int streak = 1;
+      for (int i = 1; i < workoutDates.length; i++) {
+        final currentDate = workoutDates[i];
+        final previousDate = workoutDates[i - 1];
+        final difference = previousDate.difference(currentDate).inDays;
+
+        if (difference == 1) {
+          // Consecutive day
+          streak++;
+        } else {
+          // Gap found, break the streak
+          break;
+        }
+      }
+
+      return streak;
+    } catch (e) {
+      print('❌ Error calculating workout streak: $e');
+      return 0;
+    }
+  }
+
+  Future<int> getFollowerCount(String userId) async {
+    // TODO: Implement follower system
+    return 0;
+  }
 }
