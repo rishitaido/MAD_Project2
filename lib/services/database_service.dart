@@ -2,11 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
-import '../models/user_model.dart';
-import '../models/workout_model.dart';
-import '../models/post_model.dart';
-import '../models/challenge_model.dart';
-import '../models/comment_model.dart';
+import '../../models/user_model.dart';
+import '../../models/workout_model.dart';
+import '../../models/post_model.dart';
+import '../../models/challenge_model.dart';
+import '../../models/comment_model.dart';
+import '../../models/notification_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -103,7 +104,7 @@ class DatabaseService {
     }
   }
 
-  // New: update workout (used by edit flow / history)
+  // update workout (used by edit flow / history)
   Future<void> updateWorkout(WorkoutModel workout) async {
   try {
     await _firestore
@@ -118,7 +119,7 @@ class DatabaseService {
 }
 
 
-  //  Post Method 
+  // Post Method 
 
   Future<void> createPost({
     required String workoutId,
@@ -166,14 +167,35 @@ class DatabaseService {
 
       if (doc.exists) {
         final likes = List<String>.from(doc.data()?['likes'] ?? []);
+        bool isLiking = false;
         
         if (likes.contains(userId)) {
           likes.remove(userId);
         } else {
           likes.add(userId);
+          isLiking = true;
         }
 
         await postRef.update({'likes': likes});
+
+        // Send notification if liking
+        if (isLiking) {
+          final postUserId = doc.data()?['userId'];
+          if (postUserId != null && postUserId != userId) {
+            final currentUser = await getUserData(userId);
+            if (currentUser != null) {
+              await sendNotification(
+                recipientId: postUserId,
+                senderId: userId,
+                senderName: currentUser.name,
+                senderPhoto: currentUser.profilePhoto,
+                type: NotificationType.like,
+                postId: postId,
+                message: 'liked your workout',
+              );
+            }
+          }
+        }
       }
     } catch (e) {
       print('❌ Error toggling like: $e');
@@ -195,16 +217,25 @@ class DatabaseService {
       for (var doc in comments.docs) {
         await doc.reference.delete();
       }
+      
+      // Delete notifications related to this post
+      final notifications = await _firestore
+          .collection('notifications')
+          .where('postId', isEqualTo: postId)
+          .get();
+          
+      for (var doc in notifications.docs) {
+        await doc.reference.delete();
+      }
 
-      print('✅ Post and comments deleted');
+      print('✅ Post, comments, and notifications deleted');
     } catch (e) {
       print('❌ Error deleting post: $e');
       rethrow;
     }
   }
 
-  //Comment Methods 
-
+  // Comment Methods 
   Future<void> addComment({
     required String postId,
     required String userId,
@@ -231,6 +262,23 @@ class DatabaseService {
       });
 
       print('✅ Comment added');
+
+      // Send notification
+      final postDoc = await _firestore.collection('posts').doc(postId).get();
+      if (postDoc.exists) {
+        final postUserId = postDoc.data()?['userId'];
+        if (postUserId != null && postUserId != userId) {
+          await sendNotification(
+            recipientId: postUserId,
+            senderId: userId,
+            senderName: userName,
+            senderPhoto: userPhoto,
+            type: NotificationType.comment,
+            postId: postId,
+            message: 'commented on your workout: "$text"',
+          );
+        }
+      }
     } catch (e) {
       print('❌ Error adding comment: $e');
       rethrow;
@@ -264,8 +312,7 @@ class DatabaseService {
     }
   }
 
-  //  Challenge Methods 
-
+  // Challenge Methods 
   Stream<List<ChallengeModel>> getActiveChallenges() {
     return _firestore
         .collection('challenges')
@@ -338,7 +385,6 @@ class DatabaseService {
   }
 
   // Storage for Pictures  
-
   Future<String> uploadWorkoutPhoto(String userId, File imageFile) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -396,7 +442,7 @@ class DatabaseService {
           .map((doc) => WorkoutModel.fromMap(doc.data(), doc.id))
           .toList();
 
-      // Get unique workout dates (ignore time, just consider the day)
+      // Get unique workout dates
       final workoutDates = workouts
           .map((w) => DateTime(w.date.year, w.date.month, w.date.day))
           .toSet()
@@ -442,8 +488,193 @@ class DatabaseService {
     }
   }
 
+  // Follower Methods
+  Future<void> followUser(String currentUserId, String targetUserId) async {
+    try {
+      final batch = _firestore.batch();
+      
+      // Add to target's followers
+      final targetRef = _firestore
+          .collection('users')
+          .doc(targetUserId)
+          .collection('followers')
+          .doc(currentUserId);
+      
+      batch.set(targetRef, {'timestamp': FieldValue.serverTimestamp()});
+
+      // Add to current's following
+      final currentRef = _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('following')
+          .doc(targetUserId);
+
+      batch.set(currentRef, {'timestamp': FieldValue.serverTimestamp()});
+
+      await batch.commit();
+      print('✅ Followed user');
+
+      // Send notification
+      final currentUser = await getUserData(currentUserId);
+      if (currentUser != null) {
+        await sendNotification(
+          recipientId: targetUserId,
+          senderId: currentUserId,
+          senderName: currentUser.name,
+          senderPhoto: currentUser.profilePhoto,
+          type: NotificationType.follow,
+          message: 'started following you',
+        );
+      }
+    } catch (e) {
+      print('❌ Error following user: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> unfollowUser(String currentUserId, String targetUserId) async {
+    try {
+      final batch = _firestore.batch();
+
+      final targetRef = _firestore
+          .collection('users')
+          .doc(targetUserId)
+          .collection('followers')
+          .doc(currentUserId);
+
+      batch.delete(targetRef);
+
+      final currentRef = _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('following')
+          .doc(targetUserId);
+      
+      batch.delete(currentRef);
+
+      await batch.commit();
+      print('✅ Unfollowed user');
+    } catch (e) {
+      print('❌ Error unfollowing user: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> isFollowing(String currentUserId, String targetUserId) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('following')
+          .doc(targetUserId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print('❌ Error checking follow status: $e');
+      return false;
+    }
+  }
+
   Future<int> getFollowerCount(String userId) async {
-    // TODO: Implement follower system
-    return 0;
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('followers')
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print('❌ Error getting follower count: $e');
+      return 0;
+    }
+  }
+
+  Future<int> getFollowingCount(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('following')
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print('❌ Error getting following count: $e');
+      return 0;
+    }
+  }
+
+  Future<List<UserModel>> getFollowers(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('followers')
+          .get();
+      
+      final List<UserModel> followers = [];
+      for (var doc in snapshot.docs) {
+        final userDoc = await _firestore.collection('users').doc(doc.id).get();
+        if (userDoc.exists) {
+          followers.add(UserModel.fromMap(userDoc.data()!));
+        }
+      }
+      return followers;
+    } catch (e) {
+      print('❌ Error getting followers: $e');
+      return [];
+    }
+  }
+
+  // Notification Methods
+  Future<void> sendNotification({
+    required String recipientId,
+    required String senderId,
+    required String senderName,
+    String? senderPhoto,
+    required NotificationType type,
+    String? postId,
+    required String message,
+  }) async {
+    if (recipientId == senderId) return; // Don't verify self
+
+    try {
+      final notification = NotificationModel(
+        id: '',
+        recipientId: recipientId,
+        senderId: senderId,
+        senderName: senderName,
+        senderPhoto: senderPhoto,
+        type: type,
+        postId: postId,
+        message: message,
+        timestamp: DateTime.now(),
+      );
+
+      await _firestore.collection('notifications').add(notification.toMap());
+      print('✅ Notification sent');
+    } catch (e) {
+      print('❌ Error sending notification: $e');
+    }
+  }
+
+  Stream<List<NotificationModel>> getNotifications(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('recipientId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => NotificationModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _firestore
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'isRead': true});
   }
 }

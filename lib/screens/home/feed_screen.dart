@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../models/post_model.dart';
-import '../../models/workout_model.dart';
-import '../../services/auth_service.dart';
-import '../../services/database_service.dart';
-import 'comments_screen.dart';
+import '../../../models/post_model.dart';
+import '../../../models/workout_model.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/database_service.dart';
+import 'home/../comments_screen.dart';
+
+import 'profile_screen.dart';
+import 'notifications_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -26,8 +29,11 @@ class _FeedScreenState extends State<FeedScreen> {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications coming soon!')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationsScreen(),
+                ),
               );
             },
           ),
@@ -118,10 +124,55 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
-class PostCard extends StatelessWidget {
+class PostCard extends StatefulWidget {
   final PostModel post;
 
   const PostCard({super.key, required this.post});
+
+  @override
+  State<PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<PostCard> {
+  bool _isFollowing = false;
+  bool _isLoadingFollow = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkFollowStatus();
+  }
+
+  Future<void> _checkFollowStatus() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    if (currentUser != null && currentUser.uid != widget.post.userId) {
+      final isFollowing = await DatabaseService().isFollowing(currentUser.uid, widget.post.userId);
+      if (mounted) {
+        setState(() => _isFollowing = isFollowing);
+      }
+    }
+  }
+
+  Future<void> _followUser() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    if (currentUser == null) return;
+
+    setState(() => _isLoadingFollow = true);
+    try {
+      await DatabaseService().followUser(currentUser.uid, widget.post.userId);
+      if (mounted) {
+        setState(() => _isFollowing = true);
+      }
+    } catch (e) {
+      // Handle error
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingFollow = false);
+      }
+    }
+  }
 
   String _getTimeAgo(DateTime timestamp) {
     final now = DateTime.now();
@@ -168,11 +219,21 @@ class PostCard extends StatelessWidget {
     return exercise.isCardio ? Icons.directions_run : Icons.fitness_center;
   }
 
+  void _navigateToProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(viewUserId: widget.post.userId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final currentUserId = authService.currentUser?.uid ?? '';
-    final isLiked = post.isLikedBy(currentUserId);
+    final isOwner = currentUserId == widget.post.userId;
+    final isLiked = widget.post.isLikedBy(currentUserId);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -181,32 +242,68 @@ class PostCard extends StatelessWidget {
         children: [
           // Header
           ListTile(
+            onTap: _navigateToProfile,
+            contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             leading: CircleAvatar(
-              backgroundImage: post.userPhoto != null
-                  ? NetworkImage(post.userPhoto!)
+              backgroundImage: widget.post.userPhoto != null
+                  ? NetworkImage(widget.post.userPhoto!)
                   : null,
               backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: post.userPhoto == null
+              child: widget.post.userPhoto == null
                   ? Text(
-                      post.userName.substring(0, 1).toUpperCase(),
+                      widget.post.userName.substring(0, 1).toUpperCase(),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                     )
                   : null,
             ),
-            title: Text(
-              post.userName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    widget.post.userName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!isOwner) ...[
+                  const SizedBox(width: 8),
+                  if (_isFollowing)
+                    Text(
+                      'Following',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 24,
+                      child: _isLoadingFollow
+                        ? const SizedBox(width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                        : TextButton(
+                            onPressed: _followUser,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Follow', style: TextStyle(fontSize: 12)),
+                          ),
+                    ),
+                ],
+              ],
             ),
             subtitle: Row(
               children: [
-                Text(_getTimeAgo(post.timestamp)),
-                if (post.title != null && post.title!.isNotEmpty) ...[
+                Text(_getTimeAgo(widget.post.timestamp)),
+                if (widget.post.title != null && widget.post.title!.isNotEmpty) ...[
                   const Text(' • '),
                   Expanded(
                     child: Text(
-                      post.title!,
+                      widget.post.title!,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.w500,
@@ -217,7 +314,7 @@ class PostCard extends StatelessWidget {
                 ],
               ],
             ),
-            trailing: currentUserId == post.userId
+            trailing: isOwner
                 ? PopupMenuButton<String>(
                     onSelected: (value) async {
                       if (value == 'delete') {
@@ -245,7 +342,7 @@ class PostCard extends StatelessWidget {
 
                         if (confirm == true) {
                           try {
-                            await DatabaseService().deletePost(post.id);
+                            await DatabaseService().deletePost(widget.post.id);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -293,7 +390,7 @@ class PostCard extends StatelessWidget {
 
           // Workout details
           FutureBuilder<WorkoutModel?>(
-            future: DatabaseService().getWorkout(post.workoutId),
+            future: DatabaseService().getWorkout(widget.post.workoutId),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Padding(
@@ -351,10 +448,10 @@ class PostCard extends StatelessWidget {
           ),
 
           // Caption
-          if (post.caption != null && post.caption!.isNotEmpty)
+          if (widget.post.caption != null && widget.post.caption!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(post.caption!),
+              child: Text(widget.post.caption!),
             ),
 
           const Divider(height: 1),
@@ -366,25 +463,25 @@ class PostCard extends StatelessWidget {
               children: [
                 TextButton.icon(
                   onPressed: () async {
-                    await DatabaseService().toggleLike(post.id, currentUserId);
+                    await DatabaseService().toggleLike(widget.post.id, currentUserId);
                   },
                   icon: Icon(
                     isLiked ? Icons.favorite : Icons.favorite_border,
                     color: isLiked ? Colors.red : null,
                   ),
-                  label: Text('${post.likes.length}'),
+                  label: Text('${widget.post.likes.length}'),
                 ),
                 TextButton.icon(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => CommentsScreen(post: post),
+                        builder: (context) => CommentsScreen(post: widget.post),
                       ),
                     );
                   },
                   icon: const Icon(Icons.comment_outlined),
-                  label: Text('${post.commentCount}'),
+                  label: Text('${widget.post.commentCount}'),
                 ),
                 const Spacer(),
                 IconButton(
