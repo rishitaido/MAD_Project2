@@ -5,8 +5,7 @@ import '../../../models/post_model.dart';
 import '../../../models/workout_model.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/database_service.dart';
-import 'home/../comments_screen.dart';
-
+import 'comments_screen.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
 
@@ -487,8 +486,12 @@ class _PostCardState extends State<PostCard> {
                 IconButton(
                   icon: const Icon(Icons.share_outlined),
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute( 
+                        builder: (context) => NotificationsScreen(),
+                      )
+                    
                     );
                   },
                 ),
