@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/user_model.dart';
-import '../../providers/theme_provider.dart';
-import '../../utils/profile_helpers.dart';
+import '../../../models/user_model.dart';
+import '../../../providers/theme_provider.dart';
+import '../../../utils/profile_helpers.dart';
 
 // Reusable stat card widget for displaying profile statistics
 class ProfileStatCard extends StatelessWidget {
@@ -234,6 +234,10 @@ class PersonalInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (userData == null) return const SizedBox.shrink();
+
+    final isOwnProfile = userData!.uid == user.uid;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Card(
@@ -257,19 +261,20 @@ class PersonalInfoCard extends StatelessWidget {
               ),
               const Divider(height: 1),
             ],
-            ListTile(
-              leading: const Icon(Icons.email_outlined),
-              title: const Text('Email'),
-              subtitle: Text(user.email ?? 'Not set'),
-            ),
-            const Divider(height: 1),
+            // Only show email if it's the user's own profile
+            if (isOwnProfile) ...[
+              ListTile(
+                leading: const Icon(Icons.email_outlined),
+                title: const Text('Email'),
+                subtitle: Text(userData!.email),
+              ),
+              const Divider(height: 1),
+            ],
             ListTile(
               leading: const Icon(Icons.calendar_today),
               title: const Text('Member Since'),
               subtitle: Text(
-                userData?.createdAt != null
-                    ? ProfileHelpers.formatDate(userData!.createdAt)
-                    : 'Unknown',
+                 ProfileHelpers.formatDate(userData!.createdAt),
               ),
             ),
           ],
