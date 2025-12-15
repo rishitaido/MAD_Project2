@@ -47,14 +47,14 @@ The application features a modern, clean interface designed for usability during
 *   **State Management**: `provider` package.
 *   **Media**: `image_picker` for camera/gallery integration.
 
-## � Future Developments
+##  Future Developments
 
 We're constantly improving Beast Mode Fitness. Here's what's coming next:
 
 *   **🏆 Badge & Achievement System**: Unlock badges for milestones (e.g., "7-Day Streak", "10,000 lbs Lifted") and showcase them on your profile.
 *   **🤖 AI Workout Plans**: Generate personalized workout routines based on your goals, body metrics, and equipment availability.
 
-## �🚀 Getting Started
+## 🚀 Getting Started
 
 1.  **Clone the repository**:
     ```bash
@@ -77,3 +77,4 @@ We're constantly improving Beast Mode Fitness. Here's what's coming next:
 
 ## 🎥 Demo
 	Demo Video: https://drive.google.com/file/d/16e3ZUXtrKCi64YGL5S8ip8kOWAdZ5kLo/view?usp=sharing
+
